@@ -51,7 +51,7 @@ function presentUpdateAvailable(currentVersion: any, latestVersion: any) {
   toast(
     <div>
       <div style={{ fontSize: "var(--text-headline-size)", fontWeight: 600, lineHeight: 1.3 }}>
-        Spicy Lyrics {latestVersion?.Text || "update"} is available
+        nontitled {latestVersion?.Text || "update"} is available
       </div>
       <div style={{ fontSize: "var(--text-caption-size)", opacity: 0.65, marginTop: "2px" }}>
         New lyrics features and fixes.
@@ -93,13 +93,13 @@ function showUpdateModal(currentVersion: any, latestVersion: any) {
     reactRoot.render(
       <div className="update-card-wrapper">
         <h2 className="uc-title">Update available</h2>
-        <p className="uc-subtitle">A new version of Spicy Lyrics is ready to install.</p>
+        <p className="uc-subtitle">A new version of nontitled is ready to install.</p>
 
         <div className="uc-version-row">
           <span className="uc-ver">{currentVersion?.Text || "Current"}</span>
           <span className="uc-arrow" aria-hidden="true">
             <svg width="14" height="10" viewBox="0 0 14 10" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M1 5h12M9 1l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M1 5h12M9 1l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </span>
           <span className="uc-ver new">{latestVersion?.Text || "Latest"}</span>
@@ -126,7 +126,7 @@ function showUpdateModal(currentVersion: any, latestVersion: any) {
   });
 
   PopupModal.display({
-    title: "Spicy Lyrics",
+    title: "nontitled",
     content: div,
     onClose: () => reactRoot.unmount(),
     closeHandler: dismissWithWarning,

@@ -40,13 +40,13 @@ const ResidualScriptTest =
 
 // Load Packages
 RetrievePackage("pinyin", "4.0.0", "mjs")
-  .catch(() => {});
+  .catch(() => { });
 
 RetrievePackage("aromanize", "1.0.0", "js")
-  .catch(() => {});
+  .catch(() => { });
 
 RetrievePackage("GreekRomanization", "1.0.0", "js")
-  .catch(() => {});
+  .catch(() => { });
 
 type RomanizationBranch = "Japanese" | "Chinese" | "Korean" | "Cyrillic" | "Greek";
 

@@ -9,6 +9,7 @@ type IconButtonProps = {
   title?: string;
   className?: string;
   children?: React.ReactNode;
+  style?: React.CSSProperties;
 };
 
 export function IconButton({
@@ -20,6 +21,7 @@ export function IconButton({
   title,
   className,
   children,
+  style
 }: IconButtonProps) {
   return (
     <button

@@ -5,14 +5,27 @@ const dbLogger = new Logger("Database");
 
 export const ObjectStores = {
   LyricsStore: "lyricsStore",
+  SourcesConfigStore: "sourcesConfigStore",
+  SourcesCacheStore: "sourcesCacheStore",
 }
 
-export const dbPromise = openDB("spicylyrics", 1, {
-  upgrade(db) {
+export const dbPromise = openDB("spicylyrics", 2, {
+  upgrade(db, oldVersion) {
     dbLogger.debug("Upgrade invoked");
     if (!db.objectStoreNames.contains(ObjectStores.LyricsStore)) {
       db.createObjectStore(ObjectStores.LyricsStore);
       dbLogger.debug("Created '", ObjectStores.LyricsStore, "' store");
+    }
+
+    if (oldVersion < 2) {
+      if (!db.objectStoreNames.contains(ObjectStores.SourcesConfigStore)) {
+        db.createObjectStore(ObjectStores.SourcesConfigStore, { keyPath: "id" });
+        dbLogger.debug("Created '", ObjectStores.SourcesConfigStore, "' store");
+      }
+      if (!db.objectStoreNames.contains(ObjectStores.SourcesCacheStore)) {
+        db.createObjectStore(ObjectStores.SourcesCacheStore, { keyPath: "id" });
+        dbLogger.debug("Created '", ObjectStores.SourcesCacheStore, "' store");
+      }
     }
   },
 });

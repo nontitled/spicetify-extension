@@ -1,13 +1,13 @@
-# Spicy Lyrics
+# nontitled
 
 ### Check out our *[Sitee](https://yoursit.ee/lyrics)*
 #### Make your own at -> [https://yoursit.ee](https://yoursit.ee)
 
-# How to install Spicy Lyrics
+# How to install nontitled
 
 ## 1. Using the Spicetify Marketplace (recommended)
-1. Search `Spicy Lyrics` under the "Extensions" tab
-2. Click the Install button on the Spicy Lyrics extension
+1. Search `nontitled` under the "Extensions" tab
+2. Click the Install button on the nontitled extension
 3. All done!
 
 ## 2. Externally (not recommended)
@@ -22,9 +22,10 @@
 
 Hi, I'm Spikerko (the person who made this repo). I've been really passionate about this project, and I'm really happy for this project.
 
-I've seen a problem with the Spotify Lyrics. They're plain, just static colors. So I wanted to build my own version. And here it is: **Spicy Lyrics**. Hope you like it!
+I've seen a problem with the Spotify Lyrics. They're plain, just static colors. So I wanted to build my own version. And here it is: **nontitled**. Hope you like it!
 
 ![Extension Example](./previews/page.gif)
 
 
+*Forked by [Spicy Lyrics](https://github.com/Spikerko/spicy-lyrics)*
 *Inspired by [Beautiful Lyrics](https://github.com/surfbryce/beautiful-lyrics)*

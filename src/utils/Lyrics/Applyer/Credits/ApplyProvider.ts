@@ -1,8 +1,8 @@
 const ProviderMap = {
-    "spt": "Spotify",
-    "aml": "Apple Music",
-    "spl": "Spicy Lyrics",
-    "ldb": "Local DB",
+  "spt": "Spotify",
+  "aml": "Apple Music",
+  "spl": "nontitled",
+  "ldb": "Local DB",
 }
 
 export function ApplyLyricsProvider(data: any, LyricsContainer: HTMLElement): void {
@@ -12,7 +12,10 @@ export function ApplyLyricsProvider(data: any, LyricsContainer: HTMLElement): vo
   ProviderElement.classList.add("LyricsProvider");
 
   let providerLabel = "";
-  if (
+  if (data.source === "ext") {
+    // External source: use the name provided by the source's API response
+    providerLabel = data.sourceName || "External Source";
+  } else if (
     typeof data.source === "string" &&
     Object.prototype.hasOwnProperty.call(ProviderMap, data.source)
   ) {

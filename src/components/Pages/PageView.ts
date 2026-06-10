@@ -58,6 +58,7 @@ import TransferElement from "../Utils/TransferElement.ts";
 import { IsPIP, _IsPIP_after, ClosePopupLyrics } from "../Utils/PopupLyrics.ts";
 import { CleanUpIsByCommunity } from "../../utils/Lyrics/Applyer/Credits/ApplyIsByCommunity.tsx";
 import { OpenLyricsDBPanel } from "../../utils/openLyricsDBPanel.tsx";
+import { OpenSourcesDBPanel } from "../../utils/openSourcesDBPanel.tsx";
 import { openSettingsPanel } from "../../utils/settings.ts";
 import Logger from "../../utils/logger.ts";
 import Whentil from "../../modules/Whentil.ts";
@@ -78,6 +79,7 @@ export const Tooltips: {
   CinemaView: TippyInstance | null;
   NowBarSideToggle: TippyInstance | null;
   LyricsManager: TippyInstance | null;
+  SourcesDatabase: TippyInstance | null;
   Settings: TippyInstance | null;
 } = {
   Close: null,
@@ -86,6 +88,7 @@ export const Tooltips: {
   CinemaView: null,
   NowBarSideToggle: null,
   LyricsManager: null,
+  SourcesDatabase: null,
   Settings: null,
 };
 
@@ -211,7 +214,7 @@ async function OpenPage(
         </div>
     */
 
-  
+
   PageContainer = elem;
 
   if (!$skipSpicyFont.get()) {
@@ -411,63 +414,53 @@ function AppendViewControls(ReAppend: boolean = false) {
     $currentLyricsData.get() === `NO_LYRICS:${SpotifyPlayer.GetId()}`;
   const isTTMLMakerMode = $ttmlMakerMode.get();
   elem.innerHTML = `
-        ${
-          Fullscreen.IsOpen || Fullscreen.CinemaViewOpen
-            ? ""
-            : IsPIP ? "" : `<button id="CinemaView" class="ViewControl">${Icons.CinemaView}</button>`
-        }
-        ${
-          Fullscreen.IsOpen || Fullscreen.CinemaViewOpen
-            ? IsPIP ? "" : `<button id="CompactModeToggle" class="ViewControl">${
-                IsCompactMode()
-                  ? Icons.DisableCompactModeIcon
-                  : Icons.EnableCompactModeIcon
-              }</button>`
-            : ""
-        }
+        ${Fullscreen.IsOpen || Fullscreen.CinemaViewOpen
+      ? ""
+      : IsPIP ? "" : `<button id="CinemaView" class="ViewControl">${Icons.CinemaView}</button>`
+    }
+        ${Fullscreen.IsOpen || Fullscreen.CinemaViewOpen
+      ? IsPIP ? "" : `<button id="CompactModeToggle" class="ViewControl">${IsCompactMode()
+        ? Icons.DisableCompactModeIcon
+        : Icons.EnableCompactModeIcon
+        }</button>`
+      : ""
+    }
         <button id="RomanizationToggle" class="ViewControl">
-          ${
-            isRomanized
-              ? Icons.DisableRomanization
-              : Icons.EnableRomanization
-          }
+          ${isRomanized
+      ? Icons.DisableRomanization
+      : Icons.EnableRomanization
+    }
         </button>
-        ${
-          !Fullscreen.IsOpen &&
-          !Fullscreen.CinemaViewOpen &&
-          !isSpicySidebarMode
-            ? IsPIP ? "" : `<button id="NowBarToggle" class="ViewControl">${Icons.NowBar}</button>`
-            : ""
-        }
-        ${
-          NowBarObj.Open &&
-          !isSpicySidebarMode
-            ? IsPIP ? "" : `<button id="NowBarSideToggle" class="ViewControl">${Icons.NowBarSideSwap}</button>`
-            : ""
-        }
-        ${
-          Fullscreen.IsOpen
-            ? (IsPIP ? "" : `<button id="FullscreenToggle" class="ViewControl">${
-                Fullscreen.CinemaViewOpen
-                  ? Icons.Fullscreen
-                  : Icons.CloseFullscreen
-              }</button>`)
-            : ""
-        }
-        ${
-          !Fullscreen.IsOpen && !Fullscreen.CinemaViewOpen && $isGlobalNav.get()
-            ? IsPIP ? "" : `<button id="SidebarModeToggle" class="ViewControl">${
-                isSpicySidebarMode
-                  ? Icons["panel-right-open"]
-                  : Icons["panel-right-close"]
-              }</button>`
-            : ""
-        }
-        ${
-          isTTMLMakerMode
-            ? `<button id="LyricsManager" class="ViewControl">${Icons.LyricsManager}</button>`
-            : ""
-        }
+        ${!Fullscreen.IsOpen &&
+      !Fullscreen.CinemaViewOpen &&
+      !isSpicySidebarMode
+      ? IsPIP ? "" : `<button id="NowBarToggle" class="ViewControl">${Icons.NowBar}</button>`
+      : ""
+    }
+        ${NowBarObj.Open &&
+      !isSpicySidebarMode
+      ? IsPIP ? "" : `<button id="NowBarSideToggle" class="ViewControl">${Icons.NowBarSideSwap}</button>`
+      : ""
+    }
+        ${Fullscreen.IsOpen
+      ? (IsPIP ? "" : `<button id="FullscreenToggle" class="ViewControl">${Fullscreen.CinemaViewOpen
+        ? Icons.Fullscreen
+        : Icons.CloseFullscreen
+        }</button>`)
+      : ""
+    }
+        ${!Fullscreen.IsOpen && !Fullscreen.CinemaViewOpen && $isGlobalNav.get()
+      ? IsPIP ? "" : `<button id="SidebarModeToggle" class="ViewControl">${isSpicySidebarMode
+        ? Icons["panel-right-open"]
+        : Icons["panel-right-close"]
+        }</button>`
+      : ""
+    }
+        ${isTTMLMakerMode
+      ? `<button id="LyricsManager" class="ViewControl">${Icons.LyricsManager}</button>`
+      : ""
+    }
+        <button id="SourcesDatabase" class="ViewControl">${Icons.SourcesDatabase}</button>
         ${IsPIP ? "" : `<button id="SettingsToggle" class="ViewControl">${Icons.Settings}</button>`}
         <button id="Close" class="ViewControl">${Icons.Close}</button>
     `;
@@ -543,9 +536,8 @@ function AppendViewControls(ReAppend: boolean = false) {
         if (!isPip) {
           Tooltips.Close = Spicetify.Tippy(compactModeToggle, {
             ...Spicetify.TippyProps,
-            content: `${
-              IsCompactMode() ? "Disable Compact Mode" : "Enable Compact Mode"
-            }`,
+            content: `${IsCompactMode() ? "Disable Compact Mode" : "Enable Compact Mode"
+              }`,
           });
         }
         compactModeToggle.addEventListener("click", () => {
@@ -672,9 +664,8 @@ function AppendViewControls(ReAppend: boolean = false) {
         if (!isPip) {
           Tooltips.FullscreenToggle = Spicetify.Tippy(fullscreenBtn, {
             ...Spicetify.TippyProps,
-            content: `${
-              Fullscreen.CinemaViewOpen ? "Fullscreen" : "Cinema View"
-            }`,
+            content: `${Fullscreen.CinemaViewOpen ? "Fullscreen" : "Cinema View"
+              }`,
           });
         }
         fullscreenBtn.addEventListener("click", async () => {
@@ -754,7 +745,7 @@ function AppendViewControls(ReAppend: boolean = false) {
       try {
         Tooltips.Settings = Spicetify.Tippy(settingsButton, {
           ...Spicetify.TippyProps,
-          content: `Spicy Lyrics Settings`,
+          content: `nontitled Settings`,
         });
         settingsButton.addEventListener("click", () => {
           openSettingsPanel();
@@ -777,11 +768,32 @@ function AppendViewControls(ReAppend: boolean = false) {
           if (IsPIP) {
             globalThis.focus();
           }
-          
+
           OpenLyricsDBPanel();
         });
       } catch (err) {
         controlsLogger.warn("Failed to setup Lyrics Manager tooltip", err);
+      }
+    }
+
+    const sourcesDbButton = elem.querySelector("#SourcesDatabase");
+    if (sourcesDbButton) {
+      try {
+        if (!isPip) {
+          Tooltips.SourcesDatabase = Spicetify.Tippy(sourcesDbButton, {
+            ...Spicetify.TippyProps,
+            content: `Sources Database`,
+          });
+        }
+        sourcesDbButton.addEventListener("click", () => {
+          if (IsPIP) {
+            globalThis.focus();
+          }
+
+          OpenSourcesDBPanel();
+        });
+      } catch (err) {
+        controlsLogger.warn("Failed to setup Sources Database tooltip", err);
       }
     }
   }

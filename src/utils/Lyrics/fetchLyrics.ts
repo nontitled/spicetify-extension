@@ -7,8 +7,12 @@ import { Query } from "../API/Query.ts";
 import { ProcessLyrics } from "./ProcessLyrics.ts";
 import Logger from "../logger.ts";
 import { LocalLyricsManager } from "./manager/index.ts";
+import { ParseTTML } from "./manager/parseTTML.ts";
+import { ExternalSourcesManager } from "../SourcesDatabase/index.ts";
+const NONTITLED_SOURCE_ID = "nontitled-builtin";
 import { GetExpireStore } from "../../modules/Store.ts";
 import { SLObjPack } from "../objpack.ts";
+import type { SourceLyricsEntry } from "../SourcesDatabase/types.ts";
 
 const lyricsLogger = new Logger("Lyrics Pipeline");
 const lyricsCacheLogger = new Logger("Lyrics Cache");
@@ -33,7 +37,7 @@ function setRomanizationClass(hasTransliterations: boolean | undefined): void {
  * loader, publish the type, reveal the containers and view controls, and clear the
  * fetching flag. Used by every successful return path.
  */
-function presentLyrics(lyricsData: any): void {
+export function presentLyrics(lyricsData: any): void {
   setRomanizationClass(lyricsData?.HasTransliterations);
   HideLoaderContainer();
   $currentLyricsType.set(lyricsData.Type);
@@ -41,6 +45,87 @@ function presentLyrics(lyricsData: any): void {
   PageContainer?.querySelector(".ContentBox .LyricsContainer")?.classList.remove("Hidden");
   PageView.AppendViewControls(true);
   $currentlyFetching.set(false);
+}
+
+/**
+ * Force-fetches lyrics from the Internal API for the given URI.
+ * Returns the lyrics tuple [lyricsData, 200] ready to pass to ApplyLyrics(),
+ * or null on failure.
+ */
+export async function applyAPILyrics(uri: string): Promise<[object, number] | null> {
+  const trackId = uri.split(":")[2];
+  if (!trackId) return null;
+
+  try {
+    const Token = await Platform.GetSpotifyAccessToken();
+    ShowLoaderContainer();
+
+    const queries = await Query(
+      [{ operation: "lyrics", variables: { id: trackId, auth: "SpicyLyrics-WebAuth" } }],
+      { "SpicyLyrics-WebAuth": `Bearer ${Token}` }
+    );
+
+    const lyricsQuery = queries.get("0");
+    if (!lyricsQuery || lyricsQuery.httpStatus !== 200) {
+      HideLoaderContainer();
+      return null;
+    }
+
+    const lyrics = lyricsPacker.unpack(lyricsQuery.data);
+    if (lyrics === null || lyrics === undefined || lyrics === "") {
+      HideLoaderContainer();
+      return null;
+    }
+
+    await ProcessLyrics(lyrics);
+    $currentLyricsData.set(JSON.stringify(lyrics));
+
+    if (LyricsStore) {
+      try { await LyricsStore.SetItem(trackId, lyrics); } catch (_) { /* ignore */ }
+    }
+
+    presentLyrics(lyrics);
+    return [lyrics as object, 200];
+  } catch (err) {
+    lyricsLogger.error("applyAPILyrics failed", err);
+    HideLoaderContainer();
+    return null;
+  }
+}
+
+/**
+ * Parses and presents lyrics from an external source entry for the given URI.
+ * Returns the lyrics tuple [lyricsData, 200] ready to pass to ApplyLyrics(),
+ * or null on failure.
+ */
+export async function applyExternalSourceLyrics(
+  uri: string,
+  entry: SourceLyricsEntry,
+  sourceName: string
+): Promise<[object, number] | null> {
+  const trackId = uri.split(":")[2];
+  if (!trackId) return null;
+
+  try {
+    const parsed = await ParseTTML(entry.ttml);
+    const result = (parsed && typeof parsed === "object" && "Result" in parsed)
+      ? (parsed as Record<string, unknown>).Result
+      : undefined;
+
+    if (result && typeof result === "object" && result !== null) {
+      const lyricsData = Object.assign({}, result, {
+        id: trackId,
+        source: "ext",
+        sourceName,
+      });
+      $currentLyricsData.set(JSON.stringify(lyricsData));
+      presentLyrics(lyricsData);
+      return [lyricsData, 200];
+    }
+  } catch (err) {
+    lyricsLogger.error("applyExternalSourceLyrics failed", err);
+  }
+  return null;
 }
 
 export default async function fetchLyrics(uri: string): Promise<[object | string, number] | null> {
@@ -52,7 +137,7 @@ export default async function fetchLyrics(uri: string): Promise<[object | string
     LyricsContent.classList.remove("offline");
   }
 
-  //if (!Fullscreen.IsOpen) PageView.AppendViewControls(true);
+  //if (!Fullscreen.IsOpen) PageView.AppendViewControls(true);\
 
   if (SpotifyPlayer.IsDJ()) {
     $currentlyFetching.set(false);
@@ -167,12 +252,71 @@ export default async function fetchLyrics(uri: string): Promise<[object | string
     return ["offline", 400];
   }
 
+  // --- Preferred Source Check ---
+  const prefSourceKey = Spicetify.LocalStorage.get(`SpicyLyrics_PrefSource_${uri}`);
+  if (prefSourceKey) {
+    lyricsLogger.debug("Preferred source configured:", prefSourceKey);
+    if (prefSourceKey === "api") {
+      try {
+        const apiResult = await applyAPILyrics(uri);
+        if (apiResult) {
+          $currentlyFetching.set(false);
+          return apiResult;
+        }
+      } catch (err) {
+        lyricsLogger.error("Failed to load lyrics from preferred API source", err);
+      }
+    } else {
+      try {
+        const source = await ExternalSourcesManager.getSourceById(prefSourceKey);
+        if (source && source.enabled) {
+          const sourceData = await ExternalSourcesManager.getSourceData(source);
+          if (sourceData) {
+            const entry = sourceData.lyrics.find(l => l.spotifyURIs.includes(uri));
+            if (entry) {
+              const extResult = await applyExternalSourceLyrics(uri, entry, sourceData.name || source.url);
+              if (extResult) {
+                $currentlyFetching.set(false);
+                return extResult;
+              }
+            }
+          }
+        }
+      } catch (err) {
+        lyricsLogger.error(`Failed to load lyrics from preferred external source: ${prefSourceKey}`, err);
+      }
+    }
+    lyricsLogger.debug("Preferred source failed or unavailable, falling back to default pipeline");
+  }
+
   ShowLoaderContainer();
 
-  // Fetch new lyrics if no match in localStorage
-  /* const lyricsApi = storage.get("customLyricsApi") ?? Defaults.LyricsContent.api.url;
-    const lyricsAccessToken = storage.get("lyricsApiAccessToken") ?? Defaults.LyricsContent.api.accessToken; */
+  // --- Nontitled source (highest priority for songs it has) ---
+  const nontitledEntry = await ExternalSourcesManager.getNontitledEntry(uri);
+  if (nontitledEntry) {
+    try {
+      const parsed = await ParseTTML(nontitledEntry.ttml);
+      const result = (parsed && typeof parsed === "object" && "Result" in parsed)
+        ? (parsed as Record<string, unknown>).Result
+        : undefined;
 
+      if (result && typeof result === "object" && result !== null) {
+        const lyricsData = Object.assign({}, result, {
+          id: trackId,
+          source: "ext",
+          sourceName: nontitledEntry.sourceName,
+        });
+        $currentLyricsData.set(JSON.stringify(lyricsData));
+        presentLyrics(lyricsData);
+        return [lyricsData, 200];
+      }
+    } catch (err) {
+      lyricsLogger.error("Failed to parse TTML from nontitled source", err);
+    }
+    lyricsLogger.debug("Nontitled source had entry but TTML parsing failed, falling back to API");
+  }
+
+  // Fetch new lyrics if no match in nontitled — Internal API is next
   try {
     const Token = await Platform.GetSpotifyAccessToken();
 
@@ -199,50 +343,69 @@ export default async function fetchLyrics(uri: string): Promise<[object | string
       lyricsLogger.error("Lyrics query not found");
       HideLoaderContainer();
       $currentlyFetching.set(false);
-      return ["lyrics-not-found", 404];
-    }
+      // API failed — fall through to external sources below
+    } else {
+      status = lyricsQuery.httpStatus;
 
-    status = lyricsQuery.httpStatus;
+      if (status === 200) {
+        const lyrics = lyricsPacker.unpack(lyricsQuery.data);
 
-    if (status !== 200) {
-      if (status === 404) {
+        if (lyrics !== null && lyrics !== undefined && lyrics !== "") {
+          await ProcessLyrics(lyrics);
+
+          $currentLyricsData.set(JSON.stringify(lyrics));
+
+          if (LyricsStore) {
+            try {
+              await LyricsStore.SetItem(trackId, lyrics);
+            } catch (error) {
+              lyricsCacheLogger.error("Error saving lyrics to cache", error);
+            }
+          }
+
+          presentLyrics(lyrics);
+          return [{ ...(lyrics as Record<string, unknown>), fromCache: false }, 200];
+        }
+      } else if (status === 404) {
+        // API definitively has no lyrics — fall through to external sources
+        lyricsLogger.debug("API returned 404, trying external sources", { trackId });
+      } else {
         HideLoaderContainer();
         $currentlyFetching.set(false);
-        return ["lyrics-not-found", 404];
-      }
-      HideLoaderContainer();
-      $currentlyFetching.set(false);
-      return ["status-not-200", status];
-    }
-
-    const lyrics = lyricsPacker.unpack(lyricsQuery.data);
-
-    if (lyrics === null || lyrics === undefined || lyrics === "") {
-      HideLoaderContainer();
-      $currentlyFetching.set(false);
-      return ["lyrics-not-found", 404];
-    }
-
-    await ProcessLyrics(lyrics);
-
-    $currentLyricsData.set(JSON.stringify(lyrics));
-
-    if (LyricsStore) {
-      try {
-        await LyricsStore.SetItem(trackId, lyrics);
-      } catch (error) {
-        lyricsCacheLogger.error("Error saving lyrics to cache", error);
+        return ["status-not-200", status];
       }
     }
-
-    presentLyrics(lyrics);
-    return [{ ...lyrics, fromCache: false }, 200];
   } catch (error) {
-    lyricsLogger.error("Error fetching lyrics", error);
-    $currentlyFetching.set(false);
-    HideLoaderContainer();
-    return ["unknown-error", 0];
+    lyricsLogger.error("Error fetching lyrics from API, trying external sources", error);
   }
+
+  // --- External sources fallback (lower priority than Internal API, skips nontitled which was already tried) ---
+  const sourceLyricEntry = await ExternalSourcesManager.getExcluding(uri, NONTITLED_SOURCE_ID);
+  if (sourceLyricEntry) {
+    try {
+      const parsed = await ParseTTML(sourceLyricEntry.ttml);
+      const result = (parsed && typeof parsed === "object" && "Result" in parsed)
+        ? (parsed as Record<string, unknown>).Result
+        : undefined;
+
+      if (result && typeof result === "object" && result !== null) {
+        const lyricsData = Object.assign({}, result, {
+          id: trackId,
+          source: "ext",
+          sourceName: sourceLyricEntry.sourceName,
+        });
+        $currentLyricsData.set(JSON.stringify(lyricsData));
+        presentLyrics(lyricsData);
+        return [lyricsData, 200];
+      }
+    } catch (err) {
+      lyricsLogger.error("Failed to parse TTML from external source", err);
+    }
+  }
+
+  HideLoaderContainer();
+  $currentlyFetching.set(false);
+  return ["lyrics-not-found", 404];
 }
 
 let ContainerShowLoaderTimeout: ReturnType<typeof setTimeout> | null = null;

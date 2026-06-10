@@ -41,33 +41,33 @@ const getParentContainerChildren = (parentContainer: HTMLElement) =>
   parentContainer.querySelector<HTMLElement>(":scope > *:not(#SpicyLyricsPage)");
 
 export const getNowPlayingViewPlaybarButton = () => {
-  // console.log("[Spicy Lyrics Debug] getNowPlayingViewPlaybarButton");
+  // console.log("[nontitled Debug] getNowPlayingViewPlaybarButton");
   return document.querySelector<HTMLElement>('[data-testid="control-button-npv"]');
 };
 export const getNowPlayingViewContainer = () => {
-  // console.log("[Spicy Lyrics Debug] getNowPlayingViewContainer");
+  // console.log("[nontitled Debug] getNowPlayingViewContainer");
   return getNowPlayingViewElement() ?? getDesktopPanelContainer();
 };
 export const getNowPlayingViewParentContainer = () => {
-  // console.log("[Spicy Lyrics Debug] getNowPlayingViewParentContainer");
+  // console.log("[nontitled Debug] getNowPlayingViewParentContainer");
   return getRightSidebarParentContainer();
 };
 const appendOpen = () => {
-  // console.log("[Spicy Lyrics Debug] appendOpen");
+  // console.log("[nontitled Debug] appendOpen");
   getSpicySidebarActiveBody().classList.add("SpicySidebarLyrics__Active");
 };
 const appendClosed = () => {
-  // console.log("[Spicy Lyrics Debug] appendClosed");
+  // console.log("[nontitled Debug] appendClosed");
   getSpicySidebarActiveBody().classList.remove("SpicySidebarLyrics__Active");
 };
 
 export const getQueuePlaybarButton = () => {
-  // console.log("[Spicy Lyrics Debug] getNowPlayingViewPlaybarButton");
+  // console.log("[nontitled Debug] getNowPlayingViewPlaybarButton");
   return document.querySelector<HTMLElement>('[data-testid="control-button-queue"]');
 };
 
 const getDevicesPlaybarButton = () => {
-  // console.log("[Spicy Lyrics Debug] getNowPlayingViewPlaybarButton");
+  // console.log("[nontitled Debug] getNowPlayingViewPlaybarButton");
   return document.querySelector<HTMLElement>('[data-restore-focus-key="device_picker"]') ?? document.querySelector<HTMLElement>('[aria-describedby="connect-message-nudge"]');
 };
 
@@ -81,7 +81,7 @@ export let isSpicySidebarMode = false;
     "Spicy Sidebar Lyrics",
     "lyrics",
     () => {
-        // console.log("[Spicy Lyrics Debug] playbarButton clicked", { isSpicySidebarMode });
+        // console.log("[nontitled Debug] playbarButton clicked", { isSpicySidebarMode });
         if (isSpicySidebarMode) {
             CloseSidebarLyrics();
         } else {
@@ -93,7 +93,7 @@ export let isSpicySidebarMode = false;
 );
  */
 export function RegisterSidebarLyrics() {
-  // console.log("[Spicy Lyrics Debug] RegisterSidebarLyrics");
+  // console.log("[nontitled Debug] RegisterSidebarLyrics");
   //playbarButton.register();
 }
 
@@ -108,13 +108,13 @@ export function cleanupSidebarLyricsObservers() {
   if (spicyLyricsPageObserver) {
     try {
       spicyLyricsPageObserver.disconnect();
-    } catch (_e) {}
+    } catch (_e) { }
     spicyLyricsPageObserver = null;
   }
   if (spicySidebarAsideObserver) {
     try {
       spicySidebarAsideObserver.disconnect();
-    } catch (_e) {}
+    } catch (_e) { }
     spicySidebarAsideObserver = null;
   }
 }
@@ -179,9 +179,9 @@ function runPageOpenWithCleanup(parentContainer: HTMLElement) {
 export function OpenSidebarLyrics(wasOpenForceUndefined: boolean = false) {
   if (!$isGlobalNav.get()) return;
   onOpen_wasThingOpen = undefined;
-  // console.log("[Spicy Lyrics Debug] OpenSidebarLyrics");
+  // console.log("[nontitled Debug] OpenSidebarLyrics");
   if (isSpicySidebarMode) {
-    // console.log("[Spicy Lyrics Debug] already in sidebar mode, returning");
+    // console.log("[nontitled Debug] already in sidebar mode, returning");
     return;
   }
   const playbarButton = getQueuePlaybarButton();
@@ -211,12 +211,12 @@ export function OpenSidebarLyrics(wasOpenForceUndefined: boolean = false) {
     source: onOpen_wasThingOpen ?? "unknown",
   });
   if (!finalContainer) {
-    // console.log("[Spicy Lyrics Debug] finalContainer not found, clicking button and waiting");
+    // console.log("[nontitled Debug] finalContainer not found, clicking button and waiting");
     playbarButton.click();
     currentNPVWhentil = Whentil.When(
       () => getQueueContainer() && !PageView.IsOpened,
       () => {
-        // console.log("[Spicy Lyrics Debug] finalContainer appeared after click");
+        // console.log("[nontitled Debug] finalContainer appeared after click");
         runPageOpenWithCleanup(parentContainer);
         currentNPVWhentil?.Cancel();
         currentNPVWhentil = null;
@@ -224,11 +224,11 @@ export function OpenSidebarLyrics(wasOpenForceUndefined: boolean = false) {
       }
     );
   } else {
-    // console.log("[Spicy Lyrics Debug] finalContainer found, opening page view");
+    // console.log("[nontitled Debug] finalContainer found, opening page view");
     currentNPVWhentil = Whentil.When(
       () => finalContainer && !PageView.IsOpened,
       () => {
-        // console.log("[Spicy Lyrics Debug] Whentil with existing container");
+        // console.log("[nontitled Debug] Whentil with existing container");
         runPageOpenWithCleanup(parentContainer);
 
         currentNPVWhentil?.Cancel();
@@ -241,22 +241,22 @@ export function OpenSidebarLyrics(wasOpenForceUndefined: boolean = false) {
   isSpicySidebarMode = true;
   $sidebarStatus.set("open");
 
-  // console.log("[Spicy Lyrics Debug] isSpicySidebarMode set to true");
+  // console.log("[nontitled Debug] isSpicySidebarMode set to true");
 }
 
 export async function CloseSidebarLyrics(auto: boolean = false) {
-  // console.log("[Spicy Lyrics Debug] CloseSidebarLyrics");
+  // console.log("[nontitled Debug] CloseSidebarLyrics");
   if (!isSpicySidebarMode) {
-    // console.log("[Spicy Lyrics Debug] not in sidebar mode, returning");
+    // console.log("[nontitled Debug] not in sidebar mode, returning");
     return;
   }
 
   currentNPVWhentil?.Cancel();
   currentNPVWhentil = null;
-  
+
   cleanupSidebarLyricsObservers();
 
-  // console.log("[Spicy Lyrics Debug] PageView.Destroy()");
+  // console.log("[nontitled Debug] PageView.Destroy()");
   await PageView.Destroy();
   appendClosed();
   CleanupQueueButtonListener();
@@ -314,7 +314,7 @@ export function SetupQueueButtonListener() {
       currentNPVWhentil?.Cancel();
       currentNPVWhentil = null;
       if (spicyLyricsPageObserver) {
-        try { spicyLyricsPageObserver.disconnect(); } catch(_e){}
+        try { spicyLyricsPageObserver.disconnect(); } catch (_e) { }
         spicyLyricsPageObserver = null;
       }
       await PageView.Destroy();

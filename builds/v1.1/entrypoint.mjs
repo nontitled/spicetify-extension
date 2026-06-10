@@ -18,7 +18,7 @@ const showVersionError = () => {
     content: `
       <div style="text-align: center; padding: 16px 0;">
         <h2 style="margin: 0 0 12px; font-size: 1.75rem; font-weight: 600;">
-          Spicy Lyrics failed to load
+          nontitled failed to load
         </h2>
         <p style="margin: 0 0 16px; opacity: 0.7;">
           We couldn't connect after multiple attempts.
@@ -44,7 +44,7 @@ const showImportError = () => {
     content: `
       <div style="text-align: center; padding: 16px 0;">
         <h2 style="margin: 0 0 12px; font-size: 1.75rem; font-weight: 600;">
-          Spicy Lyrics failed to initialize
+          nontitled failed to initialize
         </h2>
         <p style="margin: 0 0 16px; opacity: 0.7;">
           The extension couldn't be loaded properly.
@@ -91,7 +91,7 @@ const load = async (apiHost) => {
   }
 
   if (!version) {
-    console.error(`[Spicy Lyrics] [Entry] Failed to fetch version after 10 attempts:`, lastError);
+    console.error(`[nontitled] [Entry] Failed to fetch version after 10 attempts:`, lastError);
     showVersionError();
     return;
   }
@@ -105,7 +105,7 @@ const load = async (apiHost) => {
     }
   }
 
-  console.error(`[Spicy Lyrics] [Entry] Failed to import extension after 10 attempts:`, lastError);
+  console.error(`[nontitled] [Entry] Failed to import extension after 10 attempts:`, lastError);
   showImportError();
 };
 

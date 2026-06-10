@@ -149,16 +149,16 @@ export function showMigrationModal() {
         <div className="update-card-wrapper migration-card">
           <div className="udc-icon-wrap">
             <svg className="udc-migrate-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <ellipse cx="12" cy="5" rx="8" ry="3" stroke="currentColor" strokeWidth="1.75"/>
-              <path d="M4 5v5c0 1.657 3.582 3 8 3s8-1.343 8-3V5" stroke="currentColor" strokeWidth="1.75"/>
-              <path d="M4 10v5c0 1.657 3.582 3 8 3" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round"/>
-              <path d="M16 17l2.5 2.5L22 16" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"/>
+              <ellipse cx="12" cy="5" rx="8" ry="3" stroke="currentColor" strokeWidth="1.75" />
+              <path d="M4 5v5c0 1.657 3.582 3 8 3s8-1.343 8-3V5" stroke="currentColor" strokeWidth="1.75" />
+              <path d="M4 10v5c0 1.657 3.582 3 8 3" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" />
+              <path d="M16 17l2.5 2.5L22 16" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
 
           <h2 className="uc-title">Settings Migration Required</h2>
           <p className="uc-subtitle udc-desc">
-            Spicy Lyrics has updated its storage format. Your existing settings need to be migrated before you can continue. This only happens once.
+            nontitled has updated its storage format. Your existing settings need to be migrated before you can continue. This only happens once.
           </p>
 
           <div className="uc-divider" />
@@ -184,7 +184,7 @@ export function showMigrationModal() {
         <div className="update-card-wrapper migration-card">
           <div className="udc-icon-wrap">
             <svg className="udc-migrate-svg" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style={{ color: "#1db954" }}>
-              <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
 
@@ -200,7 +200,7 @@ export function showMigrationModal() {
   renderMigrate();
 
   PopupModal.display({
-    title: "Spicy Lyrics",
+    title: "nontitled",
     content: div,
     onClose: () => reactRoot.unmount(),
     closeBtn: false,

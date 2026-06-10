@@ -1,4 +1,4 @@
-# Spicy Lyrics - Security Policy
+# nontitled - Security Policy
 
 ## Reporting a Vulnerability
 
