@@ -165,6 +165,7 @@ export default async function fetchLyrics(
   const LyricsContent =
     PageContainer?.querySelector(".LyricsContainer .LyricsContent") ??
     undefined;
+  if (!LyricsContent) return;
   if (LyricsContent?.classList.contains("offline")) {
     LyricsContent.classList.remove("offline");
   }
@@ -396,44 +397,50 @@ export default async function fetchLyrics(
       $currentlyFetching.set(false);
     } else {
       status = lyricsQuery.httpStatus;
+    }
 
-      if (status === 503) {
-        $currentlyFetching.set(false);
-        LyricsQueueRetry.HandleQueued(uri);
-        return ["lyrics-queued", 503];
-      }
+    if (status === 503) {
+      // The server accepted the request but hasn't processed it yet — it's
+      // queued. Surface the queue loader immediately and hand off to the retry
+      // loop, which keeps polling with backoff (and survives page close / view
+      // swaps). We deliberately leave the loader up and return a sentinel so no
+      // error notice is rendered.
+      $currentlyFetching.set(false);
+      LyricsQueueRetry.HandleQueued(uri);
+      return ["lyrics-queued", 503];
+    }
 
-      if (status === 200) {
-        const lyrics = lyricsPacker.unpack(lyricsQuery.data) as any;
-
-        if (lyrics !== null && lyrics !== undefined && lyrics !== "") {
-          await ProcessLyrics(lyrics);
-
-          lyrics.uri = uri;
-          $currentLyricsData.set(JSON.stringify(lyrics));
-
-          if (LyricsStore) {
-            try {
-              await LyricsStore.SetItem(trackId, lyrics);
-            } catch (error) {
-              lyricsCacheLogger.error("Error saving lyrics to cache", error);
-            }
-          }
-
-          presentLyrics(lyrics);
-          return [
-            { ...(lyrics as Record<string, unknown>), fromCache: false },
-            200,
-          ];
-        }
-      } else if (status === 404) {
-        lyricsLogger.debug("API returned 404, trying external sources", {
-          trackId,
-        });
-      } else {
+    if (status !== 200) {
+      if (status === 404) {
         HideLoaderContainer();
         $currentlyFetching.set(false);
-        return ["status-not-200", status];
+        return ["lyrics-not-found", 404];
+      }
+      HideLoaderContainer();
+      $currentlyFetching.set(false);
+      return ["status-not-200", status];
+    }
+
+    const lyrics = lyricsPacker.unpack(lyricsQuery.data) as any;
+
+    if (lyrics === null || lyrics === undefined || lyrics === "") {
+      HideLoaderContainer();
+      $currentlyFetching.set(false);
+      return ["lyrics-not-found", 404];
+    }
+
+    await ProcessLyrics(lyrics);
+
+    // Stamp the uri so every match downstream (saved-data, re-fetch, cache)
+    // keys off the stable uri instead of the API-supplied id.
+    lyrics.uri = uri;
+    $currentLyricsData.set(JSON.stringify(lyrics));
+
+    if (LyricsStore) {
+      try {
+        await LyricsStore.SetItem(trackId, lyrics);
+      } catch (error) {
+        lyricsCacheLogger.error("Error saving lyrics to cache", error);
       }
     }
   } catch (error) {
