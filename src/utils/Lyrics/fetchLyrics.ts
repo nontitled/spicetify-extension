@@ -1,5 +1,9 @@
 import { isDev } from "../../components/Global/Defaults.ts";
-import { $currentLyricsData, $currentLyricsType, $currentlyFetching } from "../stores.ts";
+import {
+  $currentLyricsData,
+  $currentLyricsType,
+  $currentlyFetching,
+} from "../stores.ts";
 import Platform from "../../components/Global/Platform.ts";
 import { SpotifyPlayer } from "../../components/Global/SpotifyPlayer.ts";
 import PageView, { PageContainer } from "../../components/Pages/PageView.ts";
@@ -10,6 +14,7 @@ import { LocalLyricsManager } from "./manager/index.ts";
 import { ParseTTML } from "./manager/parseTTML.ts";
 import { ExternalSourcesManager } from "../SourcesDatabase/index.ts";
 const NONTITLED_SOURCE_ID = "nontitled-builtin";
+import { LyricsQueueRetry } from "./LyricsQueueRetry.ts";
 import { GetExpireStore } from "../../modules/Store.ts";
 import { SLObjPack } from "../objpack.ts";
 import type { SourceLyricsEntry } from "../SourcesDatabase/types.ts";
@@ -17,10 +22,16 @@ import type { SourceLyricsEntry } from "../SourcesDatabase/types.ts";
 const lyricsLogger = new Logger("Lyrics Pipeline");
 const lyricsCacheLogger = new Logger("Lyrics Cache");
 
-export const LyricsStore = GetExpireStore<any>("SpicyLyrics_LyricsStore", 13, {
-  Unit: "Days",
-  Duration: 3,
-}, isDev as true);
+// recently updated key structure - changed name
+export const LyricsStore = GetExpireStore<any>(
+  "SpicyLyrics_LyricsStore_g1",
+  1,
+  {
+    Unit: "Days",
+    Duration: 3,
+  },
+  isDev as true,
+);
 
 const lyricsPacker = new SLObjPack();
 
@@ -37,12 +48,18 @@ function setRomanizationClass(hasTransliterations: boolean | undefined): void {
  * loader, publish the type, reveal the containers and view controls, and clear the
  * fetching flag. Used by every successful return path.
  */
-export function presentLyrics(lyricsData: any): void {
+function presentLyrics(lyricsData: any): void {
+  // Lyrics are in hand — end any 503 retry loop that was running for this track.
+  LyricsQueueRetry.NotifyResolved(lyricsData?.uri);
   setRomanizationClass(lyricsData?.HasTransliterations);
   HideLoaderContainer();
   $currentLyricsType.set(lyricsData.Type);
-  PageContainer?.querySelector<HTMLElement>(".ContentBox")?.classList.remove("LyricsHidden");
-  PageContainer?.querySelector(".ContentBox .LyricsContainer")?.classList.remove("Hidden");
+  PageContainer?.querySelector<HTMLElement>(".ContentBox")?.classList.remove(
+    "LyricsHidden",
+  );
+  PageContainer?.querySelector(
+    ".ContentBox .LyricsContainer",
+  )?.classList.remove("Hidden");
   PageView.AppendViewControls(true);
   $currentlyFetching.set(false);
 }
@@ -52,7 +69,9 @@ export function presentLyrics(lyricsData: any): void {
  * Returns the lyrics tuple [lyricsData, 200] ready to pass to ApplyLyrics(),
  * or null on failure.
  */
-export async function applyAPILyrics(uri: string): Promise<[object, number] | null> {
+export async function applyAPILyrics(
+  uri: string,
+): Promise<[object, number] | null> {
   const trackId = uri.split(":")[2];
   if (!trackId) return null;
 
@@ -61,8 +80,13 @@ export async function applyAPILyrics(uri: string): Promise<[object, number] | nu
     ShowLoaderContainer();
 
     const queries = await Query(
-      [{ operation: "lyrics", variables: { id: trackId, auth: "SpicyLyrics-WebAuth" } }],
-      { "SpicyLyrics-WebAuth": `Bearer ${Token}` }
+      [
+        {
+          operation: "lyrics",
+          variables: { id: trackId, auth: "SpicyLyrics-WebAuth" },
+        },
+      ],
+      { "SpicyLyrics-WebAuth": `Bearer ${Token}` },
     );
 
     const lyricsQuery = queries.get("0");
@@ -81,7 +105,11 @@ export async function applyAPILyrics(uri: string): Promise<[object, number] | nu
     $currentLyricsData.set(JSON.stringify(lyrics));
 
     if (LyricsStore) {
-      try { await LyricsStore.SetItem(trackId, lyrics); } catch (_) { /* ignore */ }
+      try {
+        await LyricsStore.SetItem(trackId, lyrics);
+      } catch (_) {
+        /* ignore */
+      }
     }
 
     presentLyrics(lyrics);
@@ -101,16 +129,17 @@ export async function applyAPILyrics(uri: string): Promise<[object, number] | nu
 export async function applyExternalSourceLyrics(
   uri: string,
   entry: SourceLyricsEntry,
-  sourceName: string
+  sourceName: string,
 ): Promise<[object, number] | null> {
   const trackId = uri.split(":")[2];
   if (!trackId) return null;
 
   try {
     const parsed = await ParseTTML(entry.ttml);
-    const result = (parsed && typeof parsed === "object" && "Result" in parsed)
-      ? (parsed as Record<string, unknown>).Result
-      : undefined;
+    const result =
+      parsed && typeof parsed === "object" && "Result" in parsed
+        ? (parsed as Record<string, unknown>).Result
+        : undefined;
 
     if (result && typeof result === "object" && result !== null) {
       const lyricsData = Object.assign({}, result, {
@@ -128,11 +157,14 @@ export async function applyExternalSourceLyrics(
   return null;
 }
 
-export default async function fetchLyrics(uri: string): Promise<[object | string, number] | null> {
+export default async function fetchLyrics(
+  uri: string,
+): Promise<[object | string, number] | null> {
   lyricsLogger.debug("Fetch requested", uri);
   //if (!PageContainer) return;
   const LyricsContent =
-    PageContainer?.querySelector(".LyricsContainer .LyricsContent") ?? undefined;
+    PageContainer?.querySelector(".LyricsContainer .LyricsContent") ??
+    undefined;
   if (LyricsContent?.classList.contains("offline")) {
     LyricsContent.classList.remove("offline");
   }
@@ -146,10 +178,7 @@ export default async function fetchLyrics(uri: string): Promise<[object | string
 
   const mediaType = SpotifyPlayer.GetMediaType();
 
-  if (
-    mediaType &&
-    mediaType !== "audio"
-  ) {
+  if (mediaType && mediaType !== "audio") {
     $currentlyFetching.set(false);
     if (mediaType === "video") {
       return ["video-track", 400];
@@ -181,23 +210,23 @@ export default async function fetchLyrics(uri: string): Promise<[object | string
     LyricsContent.classList.add("HiddenTransitioned");
   }
 
-
   // Check if there's already data in localStorage
   const savedLyricsData = $currentLyricsData.get();
 
   if (savedLyricsData && !isDev) {
     try {
-      if (savedLyricsData.includes("NO_LYRICS")) {
-        const split = savedLyricsData.split(":");
-        const id = split[1];
-        if (id === trackId) {
+      if (savedLyricsData.startsWith("NO_LYRICS:")) {
+        // Sentinel format is `NO_LYRICS:<uri>`. The uri itself contains colons,
+        // so strip the prefix rather than splitting on ":".
+        const savedUri = savedLyricsData.slice("NO_LYRICS:".length);
+        if (savedUri === uri) {
           $currentlyFetching.set(false);
           return ["lyrics-not-found", 404];
         }
       } else {
         const lyricsData = JSON.parse(savedLyricsData);
-        // Return the stored lyrics if the ID matches the track ID
-        if (lyricsData?.id === trackId) {
+        // Return the stored lyrics if the URI matches the current track URI
+        if (lyricsData?.uri === uri) {
           presentLyrics(lyricsData);
           return [lyricsData, 200];
         }
@@ -211,7 +240,7 @@ export default async function fetchLyrics(uri: string): Promise<[object | string
 
   const localLyric = await LocalLyricsManager.get(uri);
   if (localLyric) {
-    const lyricsData = { ...localLyric, id: trackId };
+    const lyricsData = { ...localLyric, uri };
     $currentLyricsData.set(JSON.stringify(lyricsData));
     presentLyrics(lyricsData);
     return [lyricsData, 200];
@@ -234,7 +263,10 @@ export default async function fetchLyrics(uri: string): Promise<[object | string
           $currentlyFetching.set(false);
           return ["lyrics-not-found", 404];
         }
-        const lyricsFromCache = lyricsFromCacheRes ?? {};
+        // Tag the cached payload with the current uri so the saved-data and
+        // re-fetch checks (which match on uri) recognise it — older cache
+        // entries predate the uri field.
+        const lyricsFromCache = { ...(lyricsFromCacheRes ?? {}), uri };
         $currentLyricsData.set(JSON.stringify(lyricsFromCache));
         presentLyrics(lyricsFromCache);
         return [{ ...lyricsFromCache, fromCache: true }, 200];
@@ -246,14 +278,15 @@ export default async function fetchLyrics(uri: string): Promise<[object | string
     }
   }
 
-
   if (!navigator.onLine) {
     $currentlyFetching.set(false);
     return ["offline", 400];
   }
 
   // --- Preferred Source Check ---
-  const prefSourceKey = Spicetify.LocalStorage.get(`SpicyLyrics_PrefSource_${uri}`);
+  const prefSourceKey = Spicetify.LocalStorage.get(
+    `SpicyLyrics_PrefSource_${uri}`,
+  );
   if (prefSourceKey) {
     lyricsLogger.debug("Preferred source configured:", prefSourceKey);
     if (prefSourceKey === "api") {
@@ -264,17 +297,27 @@ export default async function fetchLyrics(uri: string): Promise<[object | string
           return apiResult;
         }
       } catch (err) {
-        lyricsLogger.error("Failed to load lyrics from preferred API source", err);
+        lyricsLogger.error(
+          "Failed to load lyrics from preferred API source",
+          err,
+        );
       }
     } else {
       try {
-        const source = await ExternalSourcesManager.getSourceById(prefSourceKey);
+        const source =
+          await ExternalSourcesManager.getSourceById(prefSourceKey);
         if (source && source.enabled) {
           const sourceData = await ExternalSourcesManager.getSourceData(source);
           if (sourceData) {
-            const entry = sourceData.lyrics.find(l => l.spotifyURIs.includes(uri));
+            const entry = sourceData.lyrics.find((l) =>
+              l.spotifyURIs.includes(uri),
+            );
             if (entry) {
-              const extResult = await applyExternalSourceLyrics(uri, entry, sourceData.name || source.url);
+              const extResult = await applyExternalSourceLyrics(
+                uri,
+                entry,
+                sourceData.name || source.url,
+              );
               if (extResult) {
                 $currentlyFetching.set(false);
                 return extResult;
@@ -283,10 +326,15 @@ export default async function fetchLyrics(uri: string): Promise<[object | string
           }
         }
       } catch (err) {
-        lyricsLogger.error(`Failed to load lyrics from preferred external source: ${prefSourceKey}`, err);
+        lyricsLogger.error(
+          `Failed to load lyrics from preferred external source: ${prefSourceKey}`,
+          err,
+        );
       }
     }
-    lyricsLogger.debug("Preferred source failed or unavailable, falling back to default pipeline");
+    lyricsLogger.debug(
+      "Preferred source failed or unavailable, falling back to default pipeline",
+    );
   }
 
   ShowLoaderContainer();
@@ -296,9 +344,10 @@ export default async function fetchLyrics(uri: string): Promise<[object | string
   if (nontitledEntry) {
     try {
       const parsed = await ParseTTML(nontitledEntry.ttml);
-      const result = (parsed && typeof parsed === "object" && "Result" in parsed)
-        ? (parsed as Record<string, unknown>).Result
-        : undefined;
+      const result =
+        parsed && typeof parsed === "object" && "Result" in parsed
+          ? (parsed as Record<string, unknown>).Result
+          : undefined;
 
       if (result && typeof result === "object" && result !== null) {
         const lyricsData = Object.assign({}, result, {
@@ -313,7 +362,9 @@ export default async function fetchLyrics(uri: string): Promise<[object | string
     } catch (err) {
       lyricsLogger.error("Failed to parse TTML from nontitled source", err);
     }
-    lyricsLogger.debug("Nontitled source had entry but TTML parsing failed, falling back to API");
+    lyricsLogger.debug(
+      "Nontitled source had entry but TTML parsing failed, falling back to API",
+    );
   }
 
   // Fetch new lyrics if no match in nontitled — Internal API is next
@@ -335,7 +386,7 @@ export default async function fetchLyrics(uri: string): Promise<[object | string
       ],
       {
         "SpicyLyrics-WebAuth": `Bearer ${Token}`,
-      }
+      },
     );
 
     const lyricsQuery = queries.get("0");
@@ -343,16 +394,22 @@ export default async function fetchLyrics(uri: string): Promise<[object | string
       lyricsLogger.error("Lyrics query not found");
       HideLoaderContainer();
       $currentlyFetching.set(false);
-      // API failed — fall through to external sources below
     } else {
       status = lyricsQuery.httpStatus;
 
+      if (status === 503) {
+        $currentlyFetching.set(false);
+        LyricsQueueRetry.HandleQueued(uri);
+        return ["lyrics-queued", 503];
+      }
+
       if (status === 200) {
-        const lyrics = lyricsPacker.unpack(lyricsQuery.data);
+        const lyrics = lyricsPacker.unpack(lyricsQuery.data) as any;
 
         if (lyrics !== null && lyrics !== undefined && lyrics !== "") {
           await ProcessLyrics(lyrics);
 
+          lyrics.uri = uri;
           $currentLyricsData.set(JSON.stringify(lyrics));
 
           if (LyricsStore) {
@@ -364,11 +421,15 @@ export default async function fetchLyrics(uri: string): Promise<[object | string
           }
 
           presentLyrics(lyrics);
-          return [{ ...(lyrics as Record<string, unknown>), fromCache: false }, 200];
+          return [
+            { ...(lyrics as Record<string, unknown>), fromCache: false },
+            200,
+          ];
         }
       } else if (status === 404) {
-        // API definitively has no lyrics — fall through to external sources
-        lyricsLogger.debug("API returned 404, trying external sources", { trackId });
+        lyricsLogger.debug("API returned 404, trying external sources", {
+          trackId,
+        });
       } else {
         HideLoaderContainer();
         $currentlyFetching.set(false);
@@ -376,17 +437,24 @@ export default async function fetchLyrics(uri: string): Promise<[object | string
       }
     }
   } catch (error) {
-    lyricsLogger.error("Error fetching lyrics from API, trying external sources", error);
+    lyricsLogger.error(
+      "Error fetching lyrics from API, trying external sources",
+      error,
+    );
   }
 
   // --- External sources fallback (lower priority than Internal API, skips nontitled which was already tried) ---
-  const sourceLyricEntry = await ExternalSourcesManager.getExcluding(uri, NONTITLED_SOURCE_ID);
+  const sourceLyricEntry = await ExternalSourcesManager.getExcluding(
+    uri,
+    NONTITLED_SOURCE_ID,
+  );
   if (sourceLyricEntry) {
     try {
       const parsed = await ParseTTML(sourceLyricEntry.ttml);
-      const result = (parsed && typeof parsed === "object" && "Result" in parsed)
-        ? (parsed as Record<string, unknown>).Result
-        : undefined;
+      const result =
+        parsed && typeof parsed === "object" && "Result" in parsed
+          ? (parsed as Record<string, unknown>).Result
+          : undefined;
 
       if (result && typeof result === "object" && result !== null) {
         const lyricsData = Object.assign({}, result, {
@@ -410,12 +478,16 @@ export default async function fetchLyrics(uri: string): Promise<[object | string
 
 let ContainerShowLoaderTimeout: ReturnType<typeof setTimeout> | null = null;
 
+/** Default copy shown in the loader while a lyrics request is queued (HTTP 503). */
+export const LYRICS_QUEUE_MESSAGE =
+  "Your request is in the queue — hang tight, your lyrics are on the way!";
+
 /**
  * Show the loader container after a delay
  */
 function ShowLoaderContainer(): void {
   const loaderContainer = PageContainer?.querySelector<HTMLElement>(
-    ".LyricsContainer .loaderContainer"
+    ".LyricsContainer .loaderContainer",
   );
   if (loaderContainer) {
     ContainerShowLoaderTimeout = setTimeout(() => {
@@ -425,18 +497,48 @@ function ShowLoaderContainer(): void {
 }
 
 /**
+ * Immediately reveal the loader with a "request queued" message. Used for the
+ * HTTP 503 server-queue state, where we want instant feedback (no 2s delay)
+ * plus a note explaining the wait. Idempotent and safe to call when the page is
+ * closed (no-ops if there's no loader in the current DOM).
+ */
+export function ShowQueueLoader(message: string = LYRICS_QUEUE_MESSAGE): void {
+  const loaderContainer = PageContainer?.querySelector<HTMLElement>(
+    ".LyricsContainer .loaderContainer",
+  );
+  if (!loaderContainer) return;
+
+  // We're showing now, so cancel the delayed plain-loader reveal.
+  if (ContainerShowLoaderTimeout) {
+    clearTimeout(ContainerShowLoaderTimeout);
+    ContainerShowLoaderTimeout = null;
+  }
+
+  loaderContainer.classList.add("active", "queued");
+
+  let messageEl = loaderContainer.querySelector<HTMLElement>(".loaderMessage");
+  if (!messageEl) {
+    messageEl = document.createElement("div");
+    messageEl.className = "loaderMessage";
+    loaderContainer.appendChild(messageEl);
+  }
+  messageEl.textContent = message;
+}
+
+/**
  * Hide the loader container and clear any pending timeout
  */
 function HideLoaderContainer(): void {
   const loaderContainer = PageContainer?.querySelector<HTMLElement>(
-    ".LyricsContainer .loaderContainer"
+    ".LyricsContainer .loaderContainer",
   );
   if (loaderContainer) {
     if (ContainerShowLoaderTimeout) {
       clearTimeout(ContainerShowLoaderTimeout);
       ContainerShowLoaderTimeout = null;
     }
-    loaderContainer.classList.remove("active");
+    loaderContainer.classList.remove("active", "queued");
+    loaderContainer.querySelector(".loaderMessage")?.remove();
   }
 }
 
@@ -445,7 +547,7 @@ function HideLoaderContainer(): void {
  */
 export function ClearLyricsPageContainer(): void {
   const lyricsContent = PageContainer?.querySelector<HTMLElement>(
-    ".LyricsContainer .LyricsContent"
+    ".LyricsContainer .LyricsContent",
   );
   if (lyricsContent) {
     lyricsContent.innerHTML = "";
