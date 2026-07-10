@@ -725,6 +725,13 @@ async function main() {
       const contentType = SpotifyPlayer.GetContentType();
       playbackLogger.debug("Detected content type", contentType);
 
+      if (PageView.IsOpened) {
+        const uri = event?.data?.item?.uri ?? SpotifyPlayer.GetUri();
+        if (uri) {
+          fetchLyrics(uri).then(ApplyLyrics);
+        }
+      }
+
       if (contentType === "episode") {
         PageContainer?.classList.add("episode-content-type");
       } else {

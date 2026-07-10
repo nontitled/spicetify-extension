@@ -99,11 +99,11 @@ export function SourceSelectorPanel({ onApplied }: SourceSelectorPanelProps) {
       try {
         const trackId = uri.split(":")[2];
         await LyricsStore.RemoveItem(trackId);
-      } catch (_) {}
+      } catch (_) { }
     }
 
     try {
-      let result: [object, number] | null = null;
+      let result: [object, number, string?] | null = null;
 
       if (source.kind === "api") {
         result = await applyAPILyrics(uri);
@@ -217,35 +217,195 @@ export function SourceSelectorPanel({ onApplied }: SourceSelectorPanelProps) {
             {artistNames}
           </div>
         </div>
-        <button
-          onClick={checkSources}
-          title="Re-check sources"
-          style={{
-            background: "none",
-            border: "none",
-            color: "rgba(255,255,255,0.4)",
-            cursor: "pointer",
-            padding: "4px",
-            flexShrink: 0,
-            display: "flex",
-            alignItems: "center",
-          }}
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
+        <div style={{ display: "flex", gap: "4px" }}>
+          <button
+            onClick={async () => {
+              const dataString = $currentLyricsData.get();
+              if (!dataString) {
+                toast.error("No lyrics currently displayed.");
+                return;
+              }
+              let data;
+              try {
+                data = JSON.parse(dataString);
+              } catch (e) {
+                toast.error("Failed to parse lyrics data.");
+                return;
+              }
+
+              let ttml: string | null = null;
+
+              if (data.source === "ldb") {
+                const { LocalLyricsManager } = await import("../../../../utils/Lyrics/manager");
+                ttml = await LocalLyricsManager.getRaw(uri || "");
+              } else if (data.source === "ext") {
+                const extSource = sources.find((s) => s.kind === "ext" && s.name === data.sourceName);
+                if (extSource && extSource.kind === "ext") {
+                  ttml = extSource.match.entry.ttml;
+                } else {
+                  // Fallback: search in ExternalSourcesManager if not in `sources` array yet
+                  const extMatches = await ExternalSourcesManager.getAvailableSourcesForUri(uri || "");
+                  const match = extMatches.find((m) => m.sourceName === data.sourceName);
+                  if (match) ttml = match.entry.ttml;
+                }
+              }
+
+              if (!ttml && data) {
+                const formatTime = (timeInSeconds: any) => {
+                  if (typeof timeInSeconds !== 'number') return "00:00.000";
+                  const totalSeconds = Math.floor(timeInSeconds);
+                  const minutes = Math.floor(totalSeconds / 60);
+                  const seconds = totalSeconds % 60;
+                  const milliseconds = Math.floor((timeInSeconds % 1) * 1000);
+                  return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${milliseconds.toString().padStart(3, '0')}`;
+                };
+
+                const escapeXml = (unsafe: string) => unsafe.replace(/[<>&'"]/g, (c) => {
+                    switch (c) {
+                        case '<': return '&lt;';
+                        case '>': return '&gt;';
+                        case '&': return '&amp;';
+                        case '\'': return '&apos;';
+                        case '"': return '&quot;';
+                        default: return c;
+                    }
+                });
+
+                let timing = "None";
+                if (data.Type === "Syllable") timing = "Word";
+                else if (data.Type === "Line") timing = "Line";
+                
+                ttml = `<?xml version="1.0" encoding="utf-8"?>\n<tt xmlns="http://www.w3.org/ns/ttml" xmlns:ttm="http://www.w3.org/ns/ttml#metadata" xmlns:amll="http://www.example.com/ns/amll" xmlns:itunes="http://music.apple.com/lyric-ttml-internal" itunes:timing="${timing}" xml:lang="en">\n  <head>\n    <metadata>\n      <ttm:agent type="person" xml:id="v1"/>\n      <ttm:agent type="other" xml:id="v2"/>\n    </metadata>\n  </head>\n  <body>\n    <div>\n`;
+                let lineIndex = 1;
+                if (data.Type === "Static" && Array.isArray(data.Lines)) {
+                  for (const line of data.Lines) {
+                    ttml += `      <p ttm:agent="v1" itunes:key="L${lineIndex++}">${escapeXml(line.Text || "")}</p>\n`;
+                  }
+                } else if (Array.isArray(data.Content)) {
+                  for (const item of data.Content) {
+                    if (item.Type === "Vocal") {
+                      const agent = item.OppositeAligned ? "v2" : "v1";
+                      if (data.Type === "Syllable" && item.Lead && Array.isArray(item.Lead.Syllables)) {
+                         ttml += `      <p begin="${formatTime(item.Lead.StartTime)}" end="${formatTime(item.Lead.EndTime)}" ttm:agent="${agent}" itunes:key="L${lineIndex++}">`;
+                         for (let i = 0; i < item.Lead.Syllables.length; i++) {
+                           const syl = item.Lead.Syllables[i];
+                           const text = escapeXml(syl.Text || "");
+                           if (typeof syl.StartTime === 'number' && typeof syl.EndTime === 'number') {
+                               ttml += `<span begin="${formatTime(syl.StartTime)}" end="${formatTime(syl.EndTime)}">${text}</span>`;
+                           } else {
+                               ttml += `<span>${text}</span>`;
+                           }
+                           if (i < item.Lead.Syllables.length - 1 && !syl.IsPartOfWord) {
+                               ttml += " ";
+                           }
+                         }
+                         if (Array.isArray(item.Background) && item.Background.length > 0) {
+                             for (const bg of item.Background) {
+                                 if (Array.isArray(bg.Syllables)) {
+                                     ttml += `<span ttm:role="x-bg" begin="${formatTime(bg.StartTime)}" end="${formatTime(bg.EndTime)}">`;
+                                     for (let j = 0; j < bg.Syllables.length; j++) {
+                                         const syl = bg.Syllables[j];
+                                         const text = escapeXml(syl.Text || "");
+                                         if (typeof syl.StartTime === 'number' && typeof syl.EndTime === 'number') {
+                                             ttml += `<span begin="${formatTime(syl.StartTime)}" end="${formatTime(syl.EndTime)}">${text}</span>`;
+                                         } else {
+                                             ttml += `<span>${text}</span>`;
+                                         }
+                                         if (j < bg.Syllables.length - 1 && !syl.IsPartOfWord) {
+                                             ttml += " ";
+                                         }
+                                     }
+                                     ttml += `</span>`;
+                                 }
+                             }
+                         }
+                         ttml += `</p>\n`;
+                      } else if (item.Lead) {
+                         ttml += `      <p begin="${formatTime(item.Lead.StartTime)}" end="${formatTime(item.Lead.EndTime)}" ttm:agent="${agent}" itunes:key="L${lineIndex++}">${escapeXml(item.Text || item.Lead.Text || "")}</p>\n`;
+                      } else {
+                         ttml += `      <p begin="${formatTime(item.StartTime)}" end="${formatTime(item.EndTime)}" ttm:agent="${agent}" itunes:key="L${lineIndex++}">${escapeXml(item.Text || "")}</p>\n`;
+                      }
+                    }
+                  }
+                }
+                ttml += `    </div>\n  </body>\n</tt>`;
+              }
+
+              if (!ttml) {
+                  toast.error("Original TTML not available for this source.");
+                  return;
+              }
+
+              console.log('Current TTML:', ttml);
+              const blob = new Blob([ttml], { type: "application/ttml+xml" });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              const safeTrack = (trackName || "lyrics").replace(/[\\/:*?"<>|]/g, "_");
+              a.download = `${safeTrack}.ttml`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+              toast.success("TTML downloaded");
+            }}
+            title="Download TTML"
+            style={{
+              background: "none",
+              border: "none",
+              color: "rgba(255,255,255,0.4)",
+              cursor: "pointer",
+              padding: "4px",
+              flexShrink: 0,
+              display: "flex",
+              alignItems: "center",
+            }}
           >
-            <polyline points="23 4 23 10 17 10" />
-            <polyline points="1 20 1 14 7 14" />
-            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-          </svg>
-        </button>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+          </button>
+          <button
+            onClick={checkSources}
+            title="Re-check sources"
+            style={{
+              background: "none",
+              border: "none",
+              color: "rgba(255,255,255,0.4)",
+              cursor: "pointer",
+              padding: "4px",
+              flexShrink: 0,
+              display: "flex",
+              alignItems: "center",
+            }}
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <polyline points="23 4 23 10 17 10" />
+              <polyline points="1 20 1 14 7 14" />
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+            </svg>
+          </button>
+        </div>
       </div>
 
       <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>

@@ -71,7 +71,7 @@ function presentLyrics(lyricsData: any): void {
  */
 export async function applyAPILyrics(
   uri: string,
-): Promise<[object, number] | null> {
+): Promise<[object, number, string?] | null> {
   const trackId = uri.split(":")[2];
   if (!trackId) return null;
 
@@ -102,6 +102,7 @@ export async function applyAPILyrics(
     }
 
     await ProcessLyrics(lyrics);
+    (lyrics as any).uri = uri;
     $currentLyricsData.set(JSON.stringify(lyrics));
 
     if (LyricsStore) {
@@ -113,7 +114,7 @@ export async function applyAPILyrics(
     }
 
     presentLyrics(lyrics);
-    return [lyrics as object, 200];
+    return [lyrics as object, 200, uri];
   } catch (err) {
     lyricsLogger.error("applyAPILyrics failed", err);
     HideLoaderContainer();
@@ -130,7 +131,7 @@ export async function applyExternalSourceLyrics(
   uri: string,
   entry: SourceLyricsEntry,
   sourceName: string,
-): Promise<[object, number] | null> {
+): Promise<[object, number, string?] | null> {
   const trackId = uri.split(":")[2];
   if (!trackId) return null;
 
@@ -144,12 +145,13 @@ export async function applyExternalSourceLyrics(
     if (result && typeof result === "object" && result !== null) {
       const lyricsData = Object.assign({}, result, {
         id: trackId,
+        uri: uri,
         source: "ext",
         sourceName,
       });
       $currentLyricsData.set(JSON.stringify(lyricsData));
       presentLyrics(lyricsData);
-      return [lyricsData, 200];
+      return [lyricsData, 200, uri];
     }
   } catch (err) {
     lyricsLogger.error("applyExternalSourceLyrics failed", err);
@@ -159,7 +161,7 @@ export async function applyExternalSourceLyrics(
 
 export default async function fetchLyrics(
   uri: string,
-): Promise<[object | string, number] | null> {
+): Promise<[object | string, number, string?] | null> {
   lyricsLogger.debug("Fetch requested", uri);
   //if (!PageContainer) return;
   const LyricsContent =
@@ -174,7 +176,7 @@ export default async function fetchLyrics(
 
   if (SpotifyPlayer.IsDJ()) {
     $currentlyFetching.set(false);
-    return ["dj", 400];
+    return ["dj", 400, uri];
   }
 
   const mediaType = SpotifyPlayer.GetMediaType();
@@ -182,20 +184,20 @@ export default async function fetchLyrics(
   if (mediaType && mediaType !== "audio") {
     $currentlyFetching.set(false);
     if (mediaType === "video") {
-      return ["video-track", 400];
+      return ["video-track", 400, uri];
     } else if (mediaType === "mixed") {
-      return ["mixed-track", 400];
+      return ["mixed-track", 400, uri];
     }
-    return ["unknown-track", 400];
+    return ["unknown-track", 400, uri];
   }
 
   const contentType = SpotifyPlayer.GetContentType();
   if (contentType !== "track") {
     $currentlyFetching.set(false);
     if (contentType === "episode") {
-      return ["episode-track", 400];
+      return ["episode-track", 400, uri];
     }
-    return ["unknown-track", 400];
+    return ["unknown-track", 400, uri];
   }
 
   const trackId = uri.split(":")[2];
@@ -214,6 +216,8 @@ export default async function fetchLyrics(
   // Check if there's already data in localStorage
   const savedLyricsData = $currentLyricsData.get();
 
+  let isDifferentTrack = false;
+
   if (savedLyricsData && !isDev) {
     try {
       if (savedLyricsData.startsWith("NO_LYRICS:")) {
@@ -222,21 +226,29 @@ export default async function fetchLyrics(
         const savedUri = savedLyricsData.slice("NO_LYRICS:".length);
         if (savedUri === uri) {
           $currentlyFetching.set(false);
-          return ["lyrics-not-found", 404];
+          return ["lyrics-not-found", 404, uri];
         }
+        isDifferentTrack = true;
       } else {
         const lyricsData = JSON.parse(savedLyricsData);
         // Return the stored lyrics if the URI matches the current track URI
         if (lyricsData?.uri === uri) {
           presentLyrics(lyricsData);
-          return [lyricsData, 200];
+          return [lyricsData, 200, uri];
         }
+        isDifferentTrack = true;
       }
     } catch (error) {
       lyricsCacheLogger.error("Error parsing saved lyrics data", error);
       $currentlyFetching.set(false);
       HideLoaderContainer();
     }
+  } else if (!savedLyricsData) {
+    isDifferentTrack = true;
+  }
+
+  if (isDifferentTrack) {
+    ClearLyricsPageContainer();
   }
 
   const localLyric = await LocalLyricsManager.get(uri);
@@ -244,7 +256,7 @@ export default async function fetchLyrics(
     const lyricsData = { ...localLyric, uri };
     $currentLyricsData.set(JSON.stringify(lyricsData));
     presentLyrics(lyricsData);
-    return [lyricsData, 200];
+    return [lyricsData, 200, uri];
   }
 
   // Local files have no real track id (uri.split(":")[2] is the URL-encoded
@@ -253,7 +265,7 @@ export default async function fetchLyrics(
   // user-uploaded TTML) but before the meaningless remote cache read.
   if (uri.startsWith("spotify:local:")) {
     $currentlyFetching.set(false);
-    return ["local-track", 400];
+    return ["local-track", 400, uri];
   }
 
   if (LyricsStore) {
@@ -262,7 +274,7 @@ export default async function fetchLyrics(
       if (lyricsFromCacheRes) {
         if (lyricsFromCacheRes?.Value === "NO_LYRICS") {
           $currentlyFetching.set(false);
-          return ["lyrics-not-found", 404];
+          return ["lyrics-not-found", 404, uri];
         }
         // Tag the cached payload with the current uri so the saved-data and
         // re-fetch checks (which match on uri) recognise it — older cache
@@ -270,18 +282,18 @@ export default async function fetchLyrics(
         const lyricsFromCache = { ...(lyricsFromCacheRes ?? {}), uri };
         $currentLyricsData.set(JSON.stringify(lyricsFromCache));
         presentLyrics(lyricsFromCache);
-        return [{ ...lyricsFromCache, fromCache: true }, 200];
+        return [{ ...lyricsFromCache, fromCache: true }, 200, uri];
       }
     } catch (error) {
       lyricsCacheLogger.error("Error parsing cache entry", error);
       $currentlyFetching.set(false);
-      return ["unknown-error", 0];
+      return ["unknown-error", 0, uri];
     }
   }
 
   if (!navigator.onLine) {
     $currentlyFetching.set(false);
-    return ["offline", 400];
+    return ["offline", 400, uri];
   }
 
   // --- Preferred Source Check ---
@@ -353,12 +365,13 @@ export default async function fetchLyrics(
       if (result && typeof result === "object" && result !== null) {
         const lyricsData = Object.assign({}, result, {
           id: trackId,
+          uri: uri,
           source: "ext",
           sourceName: nontitledEntry.sourceName,
         });
         $currentLyricsData.set(JSON.stringify(lyricsData));
         presentLyrics(lyricsData);
-        return [lyricsData, 200];
+        return [lyricsData, 200, uri];
       }
     } catch (err) {
       lyricsLogger.error("Failed to parse TTML from nontitled source", err);
@@ -407,18 +420,18 @@ export default async function fetchLyrics(
       // error notice is rendered.
       $currentlyFetching.set(false);
       LyricsQueueRetry.HandleQueued(uri);
-      return ["lyrics-queued", 503];
+      return ["lyrics-queued", 503, uri];
     }
 
     if (status !== 200) {
       if (status === 404) {
         HideLoaderContainer();
         $currentlyFetching.set(false);
-        return ["lyrics-not-found", 404];
+        return ["lyrics-not-found", 404, uri];
       }
       HideLoaderContainer();
       $currentlyFetching.set(false);
-      return ["status-not-200", status];
+      return ["status-not-200", status, uri];
     }
 
     const lyrics = lyricsPacker.unpack(lyricsQuery.data) as any;
@@ -426,7 +439,7 @@ export default async function fetchLyrics(
     if (lyrics === null || lyrics === undefined || lyrics === "") {
       HideLoaderContainer();
       $currentlyFetching.set(false);
-      return ["lyrics-not-found", 404];
+      return ["lyrics-not-found", 404, uri];
     }
 
     await ProcessLyrics(lyrics);
@@ -443,6 +456,9 @@ export default async function fetchLyrics(
         lyricsCacheLogger.error("Error saving lyrics to cache", error);
       }
     }
+
+    presentLyrics(lyrics);
+    return [lyrics, 200, uri];
   } catch (error) {
     lyricsLogger.error(
       "Error fetching lyrics from API, trying external sources",
@@ -466,12 +482,13 @@ export default async function fetchLyrics(
       if (result && typeof result === "object" && result !== null) {
         const lyricsData = Object.assign({}, result, {
           id: trackId,
+          uri: uri,
           source: "ext",
           sourceName: sourceLyricEntry.sourceName,
         });
         $currentLyricsData.set(JSON.stringify(lyricsData));
         presentLyrics(lyricsData);
-        return [lyricsData, 200];
+        return [lyricsData, 200, uri];
       }
     } catch (err) {
       lyricsLogger.error("Failed to parse TTML from external source", err);
@@ -480,7 +497,7 @@ export default async function fetchLyrics(
 
   HideLoaderContainer();
   $currentlyFetching.set(false);
-  return ["lyrics-not-found", 404];
+  return ["lyrics-not-found", 404, uri];
 }
 
 let ContainerShowLoaderTimeout: ReturnType<typeof setTimeout> | null = null;
@@ -560,3 +577,4 @@ export function ClearLyricsPageContainer(): void {
     lyricsContent.innerHTML = "";
   }
 }
+

@@ -38,7 +38,7 @@ export const cleanupApplyLyricsAbortController = () => {
  * Apply lyrics based on their type
  * @param lyrics - The lyrics data to apply
  */
-export default async function ApplyLyrics(lyricsContent: [object | string, number] | null): Promise<void> {
+export default async function ApplyLyrics(lyricsContent: [object | string, number, string?] | null): Promise<void> {
   if (!PageContainer) return;
   setBlurringLastLine(null);
   if (!lyricsContent) return;
@@ -55,7 +55,12 @@ export default async function ApplyLyrics(lyricsContent: [object | string, numbe
 
   CleanUpIsByCommunity();
 
-  const [descriptor, _status] = lyricsContent;
+  const [descriptor, _status, fetchedUri] = lyricsContent;
+
+  const currentUri = SpotifyPlayer.GetUri();
+  if (fetchedUri && currentUri && fetchedUri !== currentUri) {
+    return;
+  }
 
   let noticeContent: string | null = null;
 
