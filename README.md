@@ -41,10 +41,11 @@ Fork of Spicy Lyrics with a Source Manager already set up with the nontitled sou
 # Original description
 >Hi, I'm Spikerko (the person who made this repo). I've been really passionate about this project, and I'm really happy for this project
 > 
->I've seen a problem with the Spotify Lyrics. They're plain, just static colors. So I wanted to build my own version. And here it is: **nontitled**. Hope you like it!
+>I've seen a problem with the Spotify Lyrics. They're plain, just static colors. So I wanted to build my own version. And here it is: **Spicy Lyrics**. Hope you like it!
 >
 > ![Extension Example](./previews/page.gif)
 > 
 > 
-> *Forked by [Spicy Lyrics](https://github.com/Spikerko/spicy-lyrics)*
-> *Inspired by [Beautiful Lyrics](https://github.com/surfbryce/beautiful-lyrics)*
+*Forked by [Spicy Lyrics](https://github.com/Spikerko/spicy-lyrics)* 
+
+*Inspired by [Beautiful Lyrics](https://github.com/surfbryce/beautiful-lyrics)*
