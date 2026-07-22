@@ -469,6 +469,7 @@ function AppendViewControls(ReAppend: boolean = false) {
             ? `<button id="LyricsManager" class="ViewControl">${Icons.LyricsManager}</button>`
             : ""
         }
+        ${`<button id="SourcesDatabase" class="ViewControl">${Icons.SourcesDatabase}</button>`}
         ${IsPIP ? "" : `<button id="SettingsToggle" class="ViewControl">${Icons.Settings}</button>`}
         <button id="Close" class="ViewControl">${Icons.Close}</button>
     `;

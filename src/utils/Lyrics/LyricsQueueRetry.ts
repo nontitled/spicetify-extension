@@ -18,7 +18,7 @@ function computeDelay(attempt: number): number {
   return Math.min(MAX_DELAY_MS, Math.round(scaled));
 }
 
-type FetchResult = [object | string, number] | null;
+type FetchResult = [object | string, number, string?] | null;
 
 // `null` means the fetch was guarded/dropped (an overlapping fetch) — keep
 // waiting. The "lyrics-queued" descriptor means the server is still queuing us.

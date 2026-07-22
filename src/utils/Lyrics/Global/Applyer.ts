@@ -154,7 +154,7 @@ export default async function ApplyLyrics(lyricsContent: [object | string, numbe
     const discordLink = currentNoticeElement.querySelector("a");
     if (discordLink) {
       discordLink.addEventListener("click", () => {
-        window.open("https://discord.com/invite/uqgXU5wh8j", "_blank");
+        window.open("https://discord.nontitled.eu", "_blank");
       }, { signal: currentAbortController.signal });
     }
 
