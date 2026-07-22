@@ -23,15 +23,10 @@ const lyricsLogger = new Logger("Lyrics Pipeline");
 const lyricsCacheLogger = new Logger("Lyrics Cache");
 
 // recently updated key structure - changed name
-export const LyricsStore = GetExpireStore<any>(
-  "SpicyLyrics_LyricsStore_g1",
-  1,
-  {
-    Unit: "Days",
-    Duration: 3,
-  },
-  isDev as true,
-);
+export const LyricsStore = GetExpireStore<any>("SpicyLyrics_LyricsStore_g1", 1, {
+  Unit: "Days",
+  Duration: 3,
+}, isDev as true);
 
 const lyricsPacker = new SLObjPack();
 
@@ -165,8 +160,7 @@ export default async function fetchLyrics(
   lyricsLogger.debug("Fetch requested", uri);
   //if (!PageContainer) return;
   const LyricsContent =
-    PageContainer?.querySelector(".LyricsContainer .LyricsContent") ??
-    undefined;
+    PageContainer?.querySelector(".LyricsContainer .LyricsContent") ?? undefined;
   if (!LyricsContent) return;
   if (LyricsContent?.classList.contains("offline")) {
     LyricsContent.classList.remove("offline");
@@ -423,6 +417,17 @@ export default async function fetchLyrics(
       return ["lyrics-queued", 503, uri];
     }
 
+    if (status === 503) {
+      // The server accepted the request but hasn't processed it yet — it's
+      // queued. Surface the queue loader immediately and hand off to the retry
+      // loop, which keeps polling with backoff (and survives page close / view
+      // swaps). We deliberately leave the loader up and return a sentinel so no
+      // error notice is rendered.
+      $currentlyFetching.set(false);
+      LyricsQueueRetry.HandleQueued(uri);
+      return ["lyrics-queued", 503];
+    }
+
     if (status !== 200) {
       if (status === 404) {
         HideLoaderContainer();
@@ -528,7 +533,7 @@ function ShowLoaderContainer(): void {
  */
 export function ShowQueueLoader(message: string = LYRICS_QUEUE_MESSAGE): void {
   const loaderContainer = PageContainer?.querySelector<HTMLElement>(
-    ".LyricsContainer .loaderContainer",
+    ".LyricsContainer .loaderContainer"
   );
   if (!loaderContainer) return;
 
