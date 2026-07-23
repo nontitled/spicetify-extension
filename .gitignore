@@ -144,7 +144,6 @@ out
 # End of https://www.toptal.com/developers/gitignore/api/node
 
 
-dist/
 dist_legacy/
 
 src/utils/SpicyHasher.ts
@@ -161,9 +160,6 @@ public-storage/
 
 API_TERMS.md
 
-
-# build files
-/dist
 
 # production
 /build
