@@ -22,7 +22,7 @@ Fork of Spicy Lyrics with a Source Manager already set up with the nontitled sou
 1. You can use any method you want as the extension supports all HTTP methods (ex. GET, POST...)
 2. The response must be JSON-formatted.
 3. The response should contain the information in this format:
-```
+```json
 {
   "name": "My source",
   "description": "With over 500 word-synced songs, my source is actually the best one ever created by a single person.",
@@ -34,6 +34,7 @@ Fork of Spicy Lyrics with a Source Manager already set up with the nontitled sou
       ],
       "ttml": "<tt xmlns=..." # The actual raw TTML file.
     }
+  ]
 }
 ```
 4. That's it.
