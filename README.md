@@ -47,6 +47,8 @@ Fork of Spicy Lyrics with a Source Manager already set up with the nontitled sou
 ### How lyrics displaying works
 ![Fallbacks explaining](https://i.ibb.co/0yLKz9pG/Screenshot-2026-07-24-192750.png)
 
+Otherwise, you can pick a preferred source by choosing it from the Source Manager.
+
 # Original description
 >Hi, I'm Spikerko (the person who made this repo). I've been really passionate about this project, and I'm really happy for this project
 > 
