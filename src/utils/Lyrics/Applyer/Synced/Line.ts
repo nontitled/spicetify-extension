@@ -40,7 +40,7 @@ interface LyricsData {
   Content: LyricsLineData[];
   StartTime: number;
   SongWriters?: string[];
-  source?: "spt" | "spl" | "aml";
+  source?: "spt" | "ext" | "aml";
   classes?: string;
   styles?: Record<string, string>;
 }
@@ -193,7 +193,7 @@ export function ApplyLineLyrics(data: LyricsData, UseRomanized: boolean = false)
       ? nextLineStartTime === 0
         ? line.EndTime
         : lineEndTimeAndNextLineStartTimeDistance < getLyricsBetweenShow() &&
-            nextLineStartTime > line.EndTime
+          nextLineStartTime > line.EndTime
           ? nextLineStartTime
           : line.EndTime
       : line.EndTime;

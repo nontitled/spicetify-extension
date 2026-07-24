@@ -25,7 +25,7 @@ function openProfile(userId: string | undefined) {
 
 export function ApplyIsByCommunity(data: any, LyricsContainer: HTMLElement): void {
   if (!data.source || !LyricsContainer) return;
-  if (data.source !== "spl") return;
+  if (data.source === "ext") return;
 
   // Clean up any previous listeners before adding new ones
   if (isByCommunityAbortController) {
