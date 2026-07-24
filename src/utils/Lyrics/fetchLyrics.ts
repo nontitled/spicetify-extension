@@ -18,6 +18,8 @@ import { LyricsQueueRetry } from "./LyricsQueueRetry.ts";
 import { GetExpireStore } from "../../modules/Store.ts";
 import { SLObjPack } from "../objpack.ts";
 import type { SourceLyricsEntry } from "../SourcesDatabase/types.ts";
+import { GetTracks } from "../../components/ReactComponents/LyricsManager/utils/getTracks.ts";
+import { searchAndMatchLrcLib, convertLrcToLyricsData } from "./lrclib.ts";
 
 const lyricsLogger = new Logger("Lyrics Pipeline");
 const lyricsCacheLogger = new Logger("Lyrics Cache");
@@ -152,6 +154,102 @@ export async function applyExternalSourceLyrics(
     lyricsLogger.error("applyExternalSourceLyrics failed", err);
   }
   return null;
+}
+
+/**
+ * Resolves track metadata (name, artists, and duration) for any Spotify URI.
+ */
+export async function getTrackMetadata(uri: string) {
+  if (uri === SpotifyPlayer.GetUri()) {
+    const name = SpotifyPlayer.GetName();
+    const artists = SpotifyPlayer.GetArtists();
+    const durationMs = SpotifyPlayer.GetDuration();
+    if (name && artists) {
+      return {
+        name,
+        artists: artists.map(a => a.name),
+        durationMs,
+      };
+    }
+  }
+
+  try {
+    const tracks = await GetTracks([uri]);
+    if (tracks && tracks.length > 0) {
+      const track = tracks[0];
+      return {
+        name: track.name,
+        artists: track.artists.map(a => a.name),
+        durationMs: track.durationMs,
+      };
+    }
+  } catch (err) {
+    lyricsLogger.error("Failed to fetch track metadata for LRCLIB", err);
+  }
+  return null;
+}
+
+/**
+ * Checks if LRCLIB has lyrics available for the given track URI.
+ */
+export async function checkLrcLibLyricsAvailable(uri: string): Promise<boolean> {
+  try {
+    const metadata = await getTrackMetadata(uri);
+    if (!metadata) return false;
+    const record = await searchAndMatchLrcLib(metadata.name, metadata.artists, metadata.durationMs);
+    return record !== null;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Fetches, parses, and applies lyrics from LRCLIB for the given track URI.
+ */
+export async function applyLrcLibLyrics(
+  uri: string,
+): Promise<[object, number, string?] | null> {
+  const trackId = uri.split(":")[2];
+  if (!trackId) return null;
+
+  try {
+    ShowLoaderContainer();
+    const metadata = await getTrackMetadata(uri);
+    if (!metadata) {
+      HideLoaderContainer();
+      return null;
+    }
+
+    const record = await searchAndMatchLrcLib(metadata.name, metadata.artists, metadata.durationMs);
+    if (!record) {
+      HideLoaderContainer();
+      return null;
+    }
+
+    const lyricsData = convertLrcToLyricsData(record, uri);
+    if (!lyricsData) {
+      HideLoaderContainer();
+      return null;
+    }
+
+    await ProcessLyrics(lyricsData);
+    $currentLyricsData.set(JSON.stringify(lyricsData));
+
+    if (LyricsStore) {
+      try {
+        await LyricsStore.SetItem(trackId, lyricsData);
+      } catch (_) {
+        /* ignore */
+      }
+    }
+
+    presentLyrics(lyricsData);
+    return [lyricsData as object, 200, uri];
+  } catch (err) {
+    lyricsLogger.error("applyLrcLibLyrics failed", err);
+    HideLoaderContainer();
+    return null;
+  }
 }
 
 export default async function fetchLyrics(
@@ -306,6 +404,19 @@ export default async function fetchLyrics(
       } catch (err) {
         lyricsLogger.error(
           "Failed to load lyrics from preferred API source",
+          err,
+        );
+      }
+    } else if (prefSourceKey === "lrclib") {
+      try {
+        const lrclibResult = await applyLrcLibLyrics(uri);
+        if (lrclibResult) {
+          $currentlyFetching.set(false);
+          return lrclibResult;
+        }
+      } catch (err) {
+        lyricsLogger.error(
+          "Failed to load lyrics from preferred LRCLIB source",
           err,
         );
       }
@@ -498,6 +609,17 @@ export default async function fetchLyrics(
     } catch (err) {
       lyricsLogger.error("Failed to parse TTML from external source", err);
     }
+  }
+
+  // --- LRCLIB Fallback ---
+  try {
+    const lrclibResult = await applyLrcLibLyrics(uri);
+    if (lrclibResult) {
+      $currentlyFetching.set(false);
+      return lrclibResult;
+    }
+  } catch (err) {
+    lyricsLogger.error("Failed to load lyrics from LRCLIB fallback", err);
   }
 
   HideLoaderContainer();

@@ -25,7 +25,7 @@ function openProfile(userId: string | undefined) {
 
 export function ApplyIsByCommunity(data: any, LyricsContainer: HTMLElement): void {
   if (!data.source || !LyricsContainer) return;
-  if (data.source !== "spl") return;
+  if (!data.TTMLUploadMetadata) return;
 
   // Clean up any previous listeners before adding new ones
   if (isByCommunityAbortController) {
@@ -116,7 +116,6 @@ export function ApplyIsByCommunity(data: any, LyricsContainer: HTMLElement): voi
   }
   LyricsContainer.appendChild(songInfoElement);
 
-  if (!data.TTMLUploadMetadata) return;
 
   const uploaderSpan = songInfoElement.querySelector(".Uploader .song-info-profile-section");
   if (uploaderSpan) {

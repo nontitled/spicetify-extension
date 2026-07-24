@@ -34,7 +34,7 @@ export interface StaticLyricsData {
   offline?: boolean;
   classes?: string;
   styles?: StyleProperties;
-  source?: "spt" | "spl" | "aml";
+  source?: "spt" | "ext" | "aml";
 }
 
 /**

@@ -1,13 +1,12 @@
 const ProviderMap = {
   "spt": "Spotify",
   "aml": "Apple Music",
-  "spl": "nontitled",
   "ldb": "Local DB",
+  "lrclib": "LRCLIB"
 }
 
 export function ApplyLyricsProvider(data: any, LyricsContainer: HTMLElement): void {
   if (!data?.source || !LyricsContainer) return;
-  if (data.source === "spl") return;
 
   const ProviderElement = document.createElement("div");
   ProviderElement.classList.add("LyricsProvider");

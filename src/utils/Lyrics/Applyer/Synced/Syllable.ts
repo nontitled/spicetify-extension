@@ -61,7 +61,7 @@ interface LyricsData {
   Content: LineData[];
   StartTime: number;
   SongWriters?: string[];
-  source?: "spt" | "spl" | "aml";
+  source?: "spt" | "ext" | "aml";
   classes?: string;
   styles?: Record<string, string>;
 }
@@ -208,7 +208,7 @@ export function ApplySyllableLyrics(data: LyricsData, UseRomanized: boolean = fa
         ? nextLineStartTime === 0
           ? line.Lead.EndTime
           : lineEndTimeAndNextLineStartTimeDistance < getLyricsBetweenShow() &&
-              nextLineStartTime > line.Lead.EndTime
+            nextLineStartTime > line.Lead.EndTime
             ? nextLineStartTime
             : line.Lead.EndTime
         : line.Lead.EndTime;
