@@ -7,6 +7,8 @@ import Platform from "../../../../components/Global/Platform";
 import {
   applyAPILyrics,
   applyExternalSourceLyrics,
+  applyLrcLibLyrics,
+  checkLrcLibLyricsAvailable,
   LyricsStore,
 } from "../../../../utils/Lyrics/fetchLyrics";
 import ApplyLyrics from "../../../../utils/Lyrics/Global/Applyer";
@@ -15,6 +17,7 @@ import type { ResolvedSourceMatch } from "../../../../utils/SourcesDatabase/type
 
 type SourceOption =
   | { kind: "api"; name: "Internal API"; available: boolean | "checking" }
+  | { kind: "lrclib"; name: "LRCLIB"; available: boolean | "checking" }
   | { kind: "ext"; name: string; match: ResolvedSourceMatch; available: true };
 
 interface SourceSelectorPanelProps {
@@ -38,7 +41,10 @@ export function SourceSelectorPanel({ onApplied }: SourceSelectorPanelProps) {
 
     const trackId = uri.split(":")[2];
 
-    setSources([{ kind: "api", name: "Internal API", available: "checking" }]);
+    setSources([
+      { kind: "api", name: "Internal API", available: "checking" },
+      { kind: "lrclib", name: "LRCLIB", available: "checking" },
+    ]);
 
     const extMatches =
       await ExternalSourcesManager.getAvailableSourcesForUri(uri);
@@ -49,28 +55,43 @@ export function SourceSelectorPanel({ onApplied }: SourceSelectorPanelProps) {
       available: true,
     }));
 
-    setSources((prev) => [prev[0], ...extOptions]);
+    setSources((prev) => [prev[0], prev[1], ...extOptions]);
 
     let apiAvailable = false;
-    try {
-      const Token = await Platform.GetSpotifyAccessToken();
-      const queries = await Query(
-        [
-          {
-            operation: "lyrics",
-            variables: { id: trackId, auth: "SpicyLyrics-WebAuth" },
-          },
-        ],
-        { "SpicyLyrics-WebAuth": `Bearer ${Token}` },
-      );
-      const result = queries.get("0");
-      apiAvailable = result?.httpStatus === 200;
-    } catch (_) {
-      apiAvailable = false;
-    }
+    let lrclibAvailable = false;
+
+    const apiPromise = (async () => {
+      try {
+        const Token = await Platform.GetSpotifyAccessToken();
+        const queries = await Query(
+          [
+            {
+              operation: "lyrics",
+              variables: { id: trackId, auth: "SpicyLyrics-WebAuth" },
+            },
+          ],
+          { "SpicyLyrics-WebAuth": `Bearer ${Token}` },
+        );
+        const result = queries.get("0");
+        apiAvailable = result?.httpStatus === 200;
+      } catch (_) {
+        apiAvailable = false;
+      }
+    })();
+
+    const lrclibPromise = (async () => {
+      try {
+        lrclibAvailable = await checkLrcLibLyricsAvailable(uri);
+      } catch (_) {
+        lrclibAvailable = false;
+      }
+    })();
+
+    await Promise.all([apiPromise, lrclibPromise]);
 
     setSources([
       { kind: "api", name: "Internal API", available: apiAvailable },
+      { kind: "lrclib", name: "LRCLIB", available: lrclibAvailable },
       ...extOptions,
     ]);
   }, [uri]);
@@ -88,7 +109,7 @@ export function SourceSelectorPanel({ onApplied }: SourceSelectorPanelProps) {
 
   const handleApply = async (source: SourceOption) => {
     if (!uri) return;
-    const key = source.kind === "api" ? "api" : source.match.sourceId;
+    const key = source.kind === "api" ? "api" : source.kind === "lrclib" ? "lrclib" : source.match.sourceId;
     setApplying(key);
 
     Spicetify.LocalStorage.set(`SpicyLyrics_PrefSource_${uri}`, key);
@@ -107,6 +128,8 @@ export function SourceSelectorPanel({ onApplied }: SourceSelectorPanelProps) {
 
       if (source.kind === "api") {
         result = await applyAPILyrics(uri);
+      } else if (source.kind === "lrclib") {
+        result = await applyLrcLibLyrics(uri);
       } else {
         result = await applyExternalSourceLyrics(
           uri,
@@ -458,10 +481,10 @@ export function SourceSelectorPanel({ onApplied }: SourceSelectorPanelProps) {
           </div>
         ) : (
           availableSources.map((source) => {
-            const key = source.kind === "api" ? "api" : source.match.sourceId;
+            const key = source.kind === "api" ? "api" : source.kind === "lrclib" ? "lrclib" : source.match.sourceId;
             const isApplying = applying === key;
             const isChecking =
-              source.kind === "api" && source.available === "checking";
+              (source.kind === "api" || source.kind === "lrclib") && source.available === "checking";
 
             return (
               <button
@@ -480,6 +503,8 @@ export function SourceSelectorPanel({ onApplied }: SourceSelectorPanelProps) {
                   background:
                     source.kind === "api"
                       ? "rgba(29, 185, 84, 0.1)"
+                      : source.kind === "lrclib"
+                      ? "rgba(255, 107, 107, 0.08)"
                       : "rgba(97, 175, 254, 0.08)",
                   color: "white",
                   cursor: isApplying || isChecking ? "not-allowed" : "pointer",
@@ -493,12 +518,16 @@ export function SourceSelectorPanel({ onApplied }: SourceSelectorPanelProps) {
                     (e.currentTarget as HTMLButtonElement).style.background =
                       source.kind === "api"
                         ? "rgba(29, 185, 84, 0.2)"
+                        : source.kind === "lrclib"
+                        ? "rgba(255, 107, 107, 0.16)"
                         : "rgba(97, 175, 254, 0.16)";
                 }}
                 onMouseLeave={(e) => {
                   (e.currentTarget as HTMLButtonElement).style.background =
                     source.kind === "api"
                       ? "rgba(29, 185, 84, 0.1)"
+                      : source.kind === "lrclib"
+                      ? "rgba(255, 107, 107, 0.08)"
                       : "rgba(97, 175, 254, 0.08)";
                 }}
               >
@@ -514,8 +543,10 @@ export function SourceSelectorPanel({ onApplied }: SourceSelectorPanelProps) {
                     background:
                       source.kind === "api"
                         ? "rgba(29, 185, 84, 0.25)"
+                        : source.kind === "lrclib"
+                        ? "rgba(255, 107, 107, 0.2)"
                         : "rgba(97, 175, 254, 0.2)",
-                    color: source.kind === "api" ? "#1db954" : "#61affe",
+                    color: source.kind === "api" ? "#1db954" : source.kind === "lrclib" ? "#ff6b6b" : "#61affe",
                   }}
                 >
                   {isChecking ? (
@@ -542,6 +573,21 @@ export function SourceSelectorPanel({ onApplied }: SourceSelectorPanelProps) {
                     >
                       <polyline points="16 18 22 12 16 6" />
                       <polyline points="8 6 2 12 8 18" />
+                    </svg>
+                  ) : source.kind === "lrclib" ? (
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M9 18V5l12-2v13" />
+                      <circle cx="6" cy="18" r="3" />
+                      <circle cx="18" cy="16" r="3" />
                     </svg>
                   ) : (
                     <svg
@@ -571,7 +617,7 @@ export function SourceSelectorPanel({ onApplied }: SourceSelectorPanelProps) {
                       style={{
                         fontSize: "13px",
                         fontWeight: 600,
-                        color: source.kind === "api" ? "#1db954" : "#61affe",
+                        color: source.kind === "api" ? "#1db954" : source.kind === "lrclib" ? "#ff6b6b" : "#61affe",
                       }}
                     >
                       {source.name}
@@ -600,6 +646,16 @@ export function SourceSelectorPanel({ onApplied }: SourceSelectorPanelProps) {
                       }}
                     >
                       Internal SpicyLyrics API
+                    </div>
+                  )}
+                  {source.kind === "lrclib" && (
+                    <div
+                      style={{
+                        fontSize: "11px",
+                        color: "rgba(255,255,255,0.4)",
+                      }}
+                    >
+                      LRCLIB Synced Lyrics Database
                     </div>
                   )}
                 </div>

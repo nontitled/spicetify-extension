@@ -38,6 +38,14 @@ Fork of Spicy Lyrics with a Source Manager already set up with the nontitled sou
 ```
 4. That's it.
 
+# New features comparing to original repository
+1. Sources manager
+2. Some fixes
+3. LRCLIB support
+
+### How lyrics displaying works
+![Fallbacks explaining](https://i.ibb.co/0yLKz9pG/Screenshot-2026-07-24-192750.png)
+
 # Original description
 >Hi, I'm Spikerko (the person who made this repo). I've been really passionate about this project, and I'm really happy for this project
 > 
