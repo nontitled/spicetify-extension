@@ -3,10 +3,10 @@
 ## Reporting a Vulnerability
 
 If you believe you have discovered a security vulnerability affecting
-any part of this project, please report it responsibly using **one of the
-methods below**.
+any part of this project, please report it responsibly using **the
+method below**.
 
-### Preferred: GitHub Private Vulnerability Reporting
+###  GitHub Private Vulnerability Reporting
 
 For vulnerabilities affecting repositories hosted on GitHub, please use
 **GitHub’s Private Vulnerability Reporting** feature. This allows you to
@@ -15,14 +15,14 @@ without public disclosure.
 
 This is the **recommended** reporting method for GitHub-hosted components.
 
-### Alternative: Email
+### Alternative: Discord
 
 If GitHub Private Vulnerability Reporting is unavailable or unsuitable
-for your report, you may contact us via email.
+for your report, you may contact us via Discord.
 
-**Email:** hi@spicylyrics.org
+**Link:** discord.nontitled.eu
 
-Please include:
+When opening a ticket, please include:
 - A clear description of the issue
 - Steps to reproduce (if applicable)
 - Potential impact
