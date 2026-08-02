@@ -9,7 +9,7 @@ import { SpotifyPlayer } from "../../components/Global/SpotifyPlayer.ts";
 import PageView, { PageContainer } from "../../components/Pages/PageView.ts";
 import { Query } from "../API/Query.ts";
 import { ProcessLyrics } from "./ProcessLyrics.ts";
-import Logger from "../logger.ts";
+import Logger from "../Logger.ts";
 import { LocalLyricsManager } from "./manager/index.ts";
 import { ParseTTML } from "./manager/parseTTML.ts";
 import { ExternalSourcesManager } from "../SourcesDatabase/index.ts";
