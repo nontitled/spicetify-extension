@@ -2,13 +2,6 @@
 Fork of Spicy Lyrics with a Source Manager already set up with the nontitled source.
 
 # How to install nontitled
-
-> ## 1. Using the Spicetify Marketplace (recommended) (pending marketplace approval)
-> 1. Search `nontitled` under the "Extensions" tab
-> 2. Click the Install button on the nontitled extension
-> 3. All done!
-
-## 2. Externally (not recommended, currently the only available method)
 1. Make sure you have [Spicetify](https://spicetify.app) installed
 2. Download the [latest release](https://github.com/nontitled/spicetify-extension/releases/latest) file
 3. Put the file inside the Spicetify Extensions directory. Find the correct directory here: [https://spicetify.app/docs/customization/extensions#manual-installation](https://spicetify.app/docs/customization/extensions#manual-installation)
